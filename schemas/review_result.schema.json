@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jsc.local/schemas/review_result.schema.json",
+  "title": "JSC Review Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requirement_id",
+    "status",
+    "reason",
+    "confidence",
+    "human_review"
+  ],
+  "properties": {
+    "requirement_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["Met", "Partially Met", "Not Met", "Needs Review"]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/evidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "human_review": {
+      "enum": ["Required", "Not Required"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "Met"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["evidence"],
+        "properties": {
+          "evidence": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/evidence"
+              },
+              {
+                "properties": {
+                  "verified": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "source_document",
+        "page",
+        "section",
+        "chunk_id",
+        "verified"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_document": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chunk_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

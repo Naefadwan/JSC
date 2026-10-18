@@ -1,0 +1,23 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Sensitive and generated local data
+*.pdf
+*.docx
+*.xlsx
+data/reports/
+data/checklists/
+data/reviewer/
+models/
+indexes/
+*.db
+*.sqlite
+*.sqlite3
