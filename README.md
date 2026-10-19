@@ -82,6 +82,6 @@ Commission infrastructure.
 See `docs/open_questions.md` for decisions that require Commission
 confirmation. The working requirements register is
 `Data/checklists/requirements_register.csv`. It is excluded from version
-control because it contains internal checklist text. Its `poc_selected` column
-stays empty until the project owner approves 15–20 requirements and Role A
-reviews each proposed classification.
+control because it contains internal checklist text. On 2026-10-19 the
+project owner approved 18 proof-of-concept rows, marked `poc_selected=yes`.
+Role A still reviews each proposed classification.

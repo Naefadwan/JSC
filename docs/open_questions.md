@@ -30,10 +30,15 @@ proof of concept. The employee still makes every final regulatory decision.
    security, privacy, retention, and model-training terms in writing.
 8. **Verified evidence.** `Met` and `Not Met` both require verified evidence.
    `Needs Review` may omit evidence.
-9. **Register approval.** The project owner approves the requirements-register
-   structure and the 15–20 selected requirements. Role A reviews each
-   requirement’s type and whether its evaluation is deterministic or requires
-   the local model.
+9. **Register approval.** On 2026-10-19 the project owner approved the
+   requirements-register columns and delegated selection of the
+   proof-of-concept set. Eighteen rows are marked `poc_selected=yes` in
+   `Data/checklists/requirements_register.csv`: `GOV-001`, `GOV-006`,
+   `GOV-007`, `GOV-011`, `GOV-015`, `DIS-001`, `DIS-004`, `DIS-010`,
+   `DIS-011`, `DIS-017`, `DIS-026`, `DIS-034`, `DIS-039`, `DIS-056`,
+   `DIS-058`, `DIS-062`, `DIS-064`, and `DIS-067`. Role A still reviews each
+   selected requirement’s type and whether its evaluation is deterministic
+   or requires the local model.
 
 ## Still open
 

@@ -4,7 +4,7 @@ Local-first proof of concept for Jordan Securities Commission employees.
 The system recommends. A Commission employee always makes the final
 regulatory decision.
 
-Status date: 2026-10-18.
+Status date: 2026-10-19.
 
 ## Current position
 
@@ -21,9 +21,11 @@ Also done:
   version control.
 - Five source reports are on disk under `Data/reports/`.
 
-The Phase 1 gate is not closed. `poc_selected` is still empty, Role A has
-not reviewed classifications, and the review-result schema still accepts
-`Partially Met` and requires verified evidence for `Met` only.
+The project owner approved the register columns and the 18-row
+proof-of-concept set on 2026-10-19. The Phase 1 gate is not closed. Role A
+has not reviewed classifications, the five reports are not yet in the
+inventory, and the review-result schema still accepts `Partially Met` and
+requires verified evidence for `Met` only.
 
 ## How work is accepted
 
@@ -48,24 +50,17 @@ comparison before the Phase 4 gate passes.
 Owner: project owner for selection. Role A reviews classification.
 Role C implements the schema alignment.
 
-### 1. Approve the register and select the PoC set
+### 1. Proof-of-concept set
 
-Confirm these columns in `Data/checklists/requirements_register.csv`:
+Selected on 2026-10-19 in `Data/checklists/requirements_register.csv`.
+These 18 rows are the only requirements Phases 2 and 3 will run:
 
-`requirement_id`, `checklist`, `section`, `requirement_text_ar`,
-`requirement_text_en`, `requirement_type`, `evaluation_method`,
-`poc_selected`, `owner`, `notes`.
+`GOV-001`, `GOV-006`, `GOV-007`, `GOV-011`, `GOV-015`, `DIS-001`,
+`DIS-004`, `DIS-010`, `DIS-011`, `DIS-017`, `DIS-026`, `DIS-034`,
+`DIS-039`, `DIS-056`, `DIS-058`, `DIS-062`, `DIS-064`, `DIS-067`.
 
-Mark `poc_selected` as `yes` on 15 to 20 rows. Those rows are the only
-requirements Phases 2 and 3 will run. Leave the other rows blank.
-
-The sample should include both checklists, at least one deterministic
-check, and several checks that need the local model. Rows currently
-proposed as `deterministic`: `DIS-011` to `DIS-013`, `DIS-018`, and
-`DIS-062` to `DIS-066`.
-
-`requirement_type` and `evaluation_method` are proposals. Role A reviews
-each selected row before Phase 3 uses them.
+`requirement_type` and `evaluation_method` on those rows are proposals.
+Role A reviews each selected row before Phase 3 uses them.
 
 ### 2. Record the five reports
 
@@ -222,6 +217,6 @@ data, identifiers, results, and confidential prompts must not be sent.
 
 ## Immediate next step
 
-Approve the register columns and mark 15–20 rows `poc_selected=yes`.
-Role C can align the schema with decisions 3 and 8 in parallel. Phase 2
-starts after that approval.
+Role A reviews the 18 selected classifications. Role C aligns the schema
+with decisions 3 and 8 and fills the report inventory. Phase 2 starts
+after the schema matches the confirmed evidence rules.
