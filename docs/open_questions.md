@@ -49,9 +49,12 @@ proof of concept. The employee still makes every final regulatory decision.
 
 ## Follow-up
 
-The current review-result schema still accepts `Partially Met`, and it
-requires verified evidence for `Met` only. Aligning the schema with decisions
-3 and 8 is a separate change.
+On 2026-10-19 the review-result schema and typed model were aligned with
+decisions 3, 4, and 8. `Partially Met` is rejected. `Met` and `Not Met`
+require verified evidence. `human_review` may be `Not Required` only when
+`evaluation_method` is `deterministic`, the evidence is verified, and
+confidence is at least 0.85. The threshold is versioned in
+`src/jsc_review/review/policy.json`.
 
 ADR 0001 continues to prohibit external services until the conditional model
 fallback in decision 6 receives the required written approval. Any approved

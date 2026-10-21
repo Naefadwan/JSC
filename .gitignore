@@ -1,5 +1,6 @@
 .env
 .venv/
+.venv313/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -16,6 +17,7 @@ dist/
 data/reports/
 data/checklists/
 data/reviewer/
+data/owner_review/
 models/
 indexes/
 *.db

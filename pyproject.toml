@@ -13,6 +13,7 @@ dependencies = [
     "jsonschema>=4.23,<5",
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
+    "pymupdf>=1.24,<2",
     "uvicorn>=0.34,<1",
 ]
 
@@ -29,7 +30,13 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-jsc_review = ["py.typed"]
+jsc_review = [
+    "py.typed",
+    "review/policy.json",
+    "review/model.json",
+    "review/prompt_requirement.txt",
+    "retrieval/bm25_config.json",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

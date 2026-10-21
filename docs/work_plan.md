@@ -22,10 +22,10 @@ Also done:
 - Five source reports are on disk under `Data/reports/`.
 
 The project owner approved the register columns and the 18-row
-proof-of-concept set on 2026-10-19. The Phase 1 gate is not closed. Role A
-has not reviewed classifications, the five reports are not yet in the
-inventory, and the review-result schema still accepts `Partially Met` and
-requires verified evidence for `Met` only.
+proof-of-concept set on 2026-10-19. On the same day the review-result schema
+was aligned with the confirmed status, evidence, and human-review rules.
+Role A has not reviewed the 18 classifications. The five reports are being
+recorded from the local PDFs.
 
 ## How work is accepted
 
@@ -62,26 +62,22 @@ These 18 rows are the only requirements Phases 2 and 3 will run:
 `requirement_type` and `evaluation_method` on those rows are proposals.
 Role A reviews each selected row before Phase 3 uses them.
 
-### 2. Record the five reports
+### 2. Report inventory
 
-Fill `Data/templates/report_inventory.csv` (or a local copy kept out of
-version control if it contains internal paths or notes) with document ID,
-title, language, year, page count, local path, and whether the PDF is
-text, scan, or mixed. Store the PDFs outside git. They already live under
-`Data/reports/`.
+Recorded on 2026-10-19 in `Data/reports/report_inventory.csv`, which stays
+out of version control with the PDFs. All five files are mixed: they contain
+both extractable text and pages below the 30-character text threshold.
+Languages detected from extracted text are Arabic and English. PDF metadata
+did not include a title or a report year. Non-text pages range from 14 to
+159, so Phase 2 still needs OCR on those pages.
 
-### 3. Align the review-result schema
+### 3. Review-result schema
 
-Decisions 3 and 8 are confirmed and not yet in code:
-
-- Statuses are `Met`, `Not Met`, and `Needs Review`. Remove `Partially Met`.
-- `Met` and `Not Met` both require verified evidence.
-- `Needs Review` may omit evidence.
-- `human_review` may be `Not Required` only for a deterministic check with
-  verified evidence and confidence of at least 0.85.
-
-Acceptance: schema and typed models reject the old status and reject
-`Met` or `Not Met` without verified evidence. Tests, lint, and types pass.
+Aligned on 2026-10-19. Statuses are `Met`, `Not Met`, and `Needs Review`.
+`Met` and `Not Met` require verified evidence. `Needs Review` may omit
+evidence. `human_review` may be `Not Required` only for a deterministic
+result with verified evidence and confidence of at least 0.85. Each result
+also records `evaluation_method` as `deterministic` or `llm`.
 
 Phase 1 gate: clean local install starts `/health`; checks pass; schema
 policy matches the confirmed decisions; the project owner has approved the
@@ -94,15 +90,37 @@ register structure and the 15–20 selected requirements.
 Weeks 3 and 4. Owner: Role B. Reviewer: Role A.
 
 1. Detect whether each of the five PDFs is text-based, scanned, or mixed.
+   Done on 2026-10-19: all five are mixed.
 2. Extract text and tables with page-level provenance (document ID, page,
-   section, chunk ID, extraction method).
-3. Run OCR only where needed. Measure Arabic character error rate and word
-   error rate. OCR text may support verified evidence only when character
-   error rate is 5% or lower. Pages above that target cannot support `Met`.
-4. Chunk by section and heading and keep metadata on every chunk.
-5. Generate multilingual embeddings and build a local index.
+   section, chunk ID, extraction method). Text and ruled tables were
+   extracted on 2026-10-19 into `Data/reports/extracted/`. Section is still
+   blank; heading assignment is step 4. Pages with fewer than 30 characters
+   are marked `needs_ocr`.
+3. Run OCR only where needed. On 2026-10-19 Tesseract `ara+eng` read the
+   295 pages marked `needs_ocr`. Results are in `Data/reports/ocr/`. 257
+   pages produced at least 30 characters. A 10-page digital re-render
+   probe is in `Data/reports/ocr/render_probe.json`. Every page scored
+   above the 5% character-error limit (about 32% to 100%). That probe
+   compares a rendered text page with its embedded text, so reading order
+   can inflate the rate. It is not a transcription of a scanned page.
+   On 2026-10-21 the same 10 pages were scored with local Indra OCR 1.1.2
+   on Python 3.13.15. Results are in `Data/reports/ocr/indra_render_probe.json`.
+   Every page is still above 5% (about 18% to 94%). OCR text still cannot
+   support `Met`.
+4. Chunk by section and heading and keep metadata on every chunk. Embedded
+   heading chunks are in `Data/reports/chunks/`. The merged set, with the
+   257 recovered OCR pages included, is in `Data/reports/chunks_with_ocr/`.
+   Those OCR chunks have no section heading.
+5. Generate multilingual embeddings and build a local index. On 2026-10-19
+   a local BM25 index of the 3,415 merged chunks was written to
+   `indexes/chunk_bm25.json`. It searches Arabic and English tokens.
+   ONNX Runtime, PyTorch, and FAISS have no Python 3.15 wheels here, so
+   BGE-M3 and multilingual-e5 are not installed yet. The 80% top-five
+   retrieval gate is not measured.
 6. Compare candidate local models for later review use. Do not call a
-   hosted model.
+   hosted model. On 2026-10-20 `qwen3:4b` was pulled through local Ollama
+   and used at temperature 0. The context window is 4,096 tokens. A smaller
+   Qwen3 remains the fallback if this machine runs out of memory.
 7. Build golden dataset version 0: the first 30 double-reviewed judgments.
 
 Tools to evaluate, all local: PyMuPDF and pdfplumber; Tesseract, PaddleOCR,
@@ -120,7 +138,13 @@ Weeks 5 to 7. Owner: Role A for rules and prompts. Role C for API and
 persistence. Reviewer from the other role on each deliverable.
 
 1. Implement deterministic checks for the selected requirements Role A
-   marked deterministic.
+   marked deterministic. On 2026-10-21 the ownership and customer
+   thresholds were added. `DIS-010` is Met when the embedded page names
+   major shareholders and a holding is at or above 5%. `DIS-011` also
+   requires a share count. `DIS-017` is Met when a supplier or customer
+   disclosure has a figure at or above 10%, and that figure is closer to
+   the customer wording than to a shareholder table. OCR text stays
+   ineligible for Met. Unfamiliar wording stays Needs Review.
 2. Version prompt templates for presence, content-understanding, and
    completeness requirements. Run the local model at temperature 0 and
    require schema-valid JSON.
@@ -129,7 +153,13 @@ persistence. Reviewer from the other role on each deliverable.
    is an execution failure, not a partial result.
 5. Set confidence and the human-review flag using the 0.85 rule above.
 6. Expose the workflow through the API and persist results locally.
-7. Run every selected requirement against all five reports.
+7. Run every selected requirement against all five reports. On 2026-10-20
+   the local run wrote 90 schema-checked recommendations to
+   `Data/reports/reviews/findings.md`: 6 `Met` and 84 `Needs Review`.
+   Five `Met` results are recognized statement headings. One `Met` result
+   is a local-model judgment, `DIS-058` on
+   `131_10130_889_31-03-2026_12-52-11`, page 113, and it still requires
+   human review. The API does not persist these results yet.
 
 Gate: the workflow completes for all five reports; every output is
 schema-valid; every `Met` and every `Not Met` has verified evidence.
@@ -217,6 +247,16 @@ data, identifiers, results, and confidential prompts must not be sent.
 
 ## Immediate next step
 
-Role A reviews the 18 selected classifications. Role C aligns the schema
-with decisions 3 and 8 and fills the report inventory. Phase 2 starts
-after the schema matches the confirmed evidence rules.
+A Commission employee reviews `Data/reports/reviews/findings.md`.
+On 2026-10-21 the file has 14 `Met` findings and 76 `Needs Review`
+findings. Language findings that had been judged from OCR text were
+judged again from the closest embedded page. Those judgments stayed
+`Needs Review`. Six evidence quotes still come from OCR, all of them
+deterministic statement headings or the supplier disclosure on
+`163_10162_161_07-04-2026_12-47-10`. That report's major-shareholder
+wording is on page 74, and the percentage cells were not fully read.
+`131_10130_889_31-03-2026_12-52-11` still has no recognized
+major-shareholder wording. Confirm the model `Met` on `DIS-058`, page
+113 of that report, and the two statement headings that share page 102
+of `1_10000_599_29-03-2026_14-49-00`. The 80% top-five retrieval gate
+and the first 30 double-reviewed judgments are still open.

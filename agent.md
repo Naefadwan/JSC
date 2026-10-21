@@ -60,7 +60,8 @@ Every evaluated requirement must produce the following fields:
     "verified": true
   },
   "confidence": 0.0,
-  "human_review": "Required | Not Required"
+  "human_review": "Required | Not Required",
+  "evaluation_method": "deterministic | llm"
 }
 ```
 

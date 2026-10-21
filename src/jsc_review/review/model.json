@@ -1,0 +1,6 @@
+{
+  "model": "qwen3:4b",
+  "temperature": 0,
+  "host": "http://127.0.0.1:11434",
+  "num_ctx": 4096
+}

@@ -28,7 +28,7 @@ changing the review workflow.
 
 Report provenance—document ID, page, section, chunk ID, and extraction
 method—must be retained through future processing. A result cannot be `Met`
-without complete evidence verified against its cited report page.
+or `Not Met` without complete evidence verified against its cited report page.
 
 ## Consequences
 

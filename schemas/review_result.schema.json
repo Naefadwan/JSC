@@ -9,7 +9,8 @@
     "status",
     "reason",
     "confidence",
-    "human_review"
+    "human_review",
+    "evaluation_method"
   ],
   "properties": {
     "requirement_id": {
@@ -17,7 +18,7 @@
       "minLength": 1
     },
     "status": {
-      "enum": ["Met", "Partially Met", "Not Met", "Needs Review"]
+      "enum": ["Met", "Not Met", "Needs Review"]
     },
     "reason": {
       "type": "string",
@@ -40,6 +41,9 @@
     },
     "human_review": {
       "enum": ["Required", "Not Required"]
+    },
+    "evaluation_method": {
+      "enum": ["deterministic", "llm"]
     }
   },
   "allOf": [
@@ -47,7 +51,7 @@
       "if": {
         "properties": {
           "status": {
-            "const": "Met"
+            "enum": ["Met", "Not Met"]
           }
         },
         "required": ["status"]
@@ -55,6 +59,44 @@
       "then": {
         "required": ["evidence"],
         "properties": {
+          "evidence": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/evidence"
+              },
+              {
+                "properties": {
+                  "verified": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "human_review": {
+            "const": "Not Required"
+          }
+        },
+        "required": ["human_review"]
+      },
+      "then": {
+        "required": ["evidence"],
+        "properties": {
+          "status": {
+            "enum": ["Met", "Not Met"]
+          },
+          "evaluation_method": {
+            "const": "deterministic"
+          },
+          "confidence": {
+            "minimum": 0.85
+          },
           "evidence": {
             "allOf": [
               {

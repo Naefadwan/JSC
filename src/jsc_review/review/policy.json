@@ -1,0 +1,4 @@
+{
+  "human_review_not_required_min_confidence": 0.85,
+  "ocr_max_character_error_rate": 0.05
+}
