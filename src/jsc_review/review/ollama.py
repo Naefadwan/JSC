@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from jsc_review.documents.normalization import normalize_arabic
 from jsc_review.review.findings import Requirement
 
 
@@ -62,11 +63,14 @@ def judge_passage(
     prompt_path = Path(__file__).with_name("prompt_requirement.txt")
     instructions = prompt_path.read_text(encoding="utf-8").strip()
     source = "OCR text" if passage_is_ocr else "embedded report text"
+    # Normalize the passage so the model sees a stable Arabic surface form.
+    # The raw passage still lives on disk and is what the reviewer sees.
+    clean_passage = normalize_arabic(passage) or passage
     user = (
         f"Requirement {requirement.requirement_id}: {requirement.text_ar}\n"
         f"English: {requirement.text_en}\n"
         f"Passage source: {source}\n"
-        f"Passage:\n{passage}"
+        f"Passage:\n{clean_passage}"
     )
     body = {
         "model": chosen.model,

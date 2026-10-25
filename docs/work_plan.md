@@ -8,8 +8,10 @@ Status date: 2026-10-19.
 
 ## Current position
 
-Phase 1 scaffolding is implemented and verified (2026-10-15, Python 3.15):
-editable install, 10 tests, Ruff, strict mypy, and a live `/health` check.
+Phase 1 scaffolding is implemented and verified (2026-10-15, Python 3.15,
+re-verified 2026-10-21 on Python 3.13.15): editable install, 70 tests, Ruff,
+strict mypy, and a live `/health` check. The project now pins Python 3.13
+in `pyproject.toml` so local embedding wheels become available.
 
 Also done:
 
@@ -114,9 +116,12 @@ Weeks 3 and 4. Owner: Role B. Reviewer: Role A.
 5. Generate multilingual embeddings and build a local index. On 2026-10-19
    a local BM25 index of the 3,415 merged chunks was written to
    `indexes/chunk_bm25.json`. It searches Arabic and English tokens.
-   ONNX Runtime, PyTorch, and FAISS have no Python 3.15 wheels here, so
-   BGE-M3 and multilingual-e5 are not installed yet. The 80% top-five
-   retrieval gate is not measured.
+   On 2026-10-21 the project moved to Python 3.13.15, which has local
+   wheels for ONNX Runtime, PyTorch, FAISS, and sentence-transformers.
+   A multilingual embedding model (BGE-M3 or multilingual-e5) can now be
+   installed through the `retrieval` extra and added alongside BM25 as a
+   second retrieval signal. The 80% top-five retrieval gate is still to
+   be measured.
 6. Compare candidate local models for later review use. Do not call a
    hosted model. On 2026-10-20 `qwen3:4b` was pulled through local Ollama
    and used at temperature 0. The context window is 4,096 tokens. A smaller

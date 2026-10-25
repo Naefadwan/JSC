@@ -40,7 +40,7 @@ def test_share_count_is_required_for_the_holder_count_rule() -> None:
     assert named.result.status == "Met"
     assert counted.result.status == "Needs Review"
     assert counted.result.evidence is not None
-    assert "share count" in counted.result.reason
+    assert "عدد الأسهم" in counted.result.reason
 
 
 def test_comma_decimal_and_grouped_shares_are_read() -> None:

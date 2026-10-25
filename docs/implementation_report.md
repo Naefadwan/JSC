@@ -13,7 +13,7 @@ Runtime, installed from `pyproject.toml`:
 
 | Tool | Role |
 | --- | --- |
-| Python 3.11 or newer | Application language. Verified on 2026-10-15 with Python 3.15. Python 3.12 was not installed on this machine. |
+| Python 3.13 | Application language. The project pins `>=3.13,<3.14` in `pyproject.toml` so local wheels for ONNX Runtime, PyTorch, FAISS, and sentence-transformers are available. Verified on 2026-10-15 with Python 3.15 and re-verified on 2026-10-21 with Python 3.13.15. |
 | FastAPI | Local HTTP application. |
 | Uvicorn | Local server. Default address `127.0.0.1:8000`. |
 | Pydantic 2 | Typed review-result models. |
@@ -101,11 +101,14 @@ character-error limit. `supports_verified_evidence` stays false on every
 OCR page. The 5% limit is versioned in `src/jsc_review/review/policy.json`.
 
 On 2026-10-21 Python 3.13.15 was installed beside 3.15, and Indra OCR 1.1.2
-ran locally in `.venv313`. The same 10-page digital re-render is in
+ran locally. The same 10-page digital re-render is in
 `Data/reports/ocr/indra_render_probe.json`. Character error rates are about
 18% to 94%. Every page stays above the 5% limit, so Indra text cannot
 support `Met` either. The model weights are cached on this machine from
 Hugging Face. The five reports were not sent to a hosted OCR service.
+Later the same day the project promoted the 3.13 interpreter to the primary
+`.venv`, pinned Python 3.13 in `pyproject.toml`, and re-ran the full suite:
+70 tests pass, Ruff is clean, and strict mypy is clean.
 
 On 2026-10-21 the ownership and customer thresholds were applied to the
 same findings file. `DIS-010` requires a major-shareholder disclosure and
@@ -134,9 +137,10 @@ heading.
 The searchable index is `indexes/chunk_bm25.json`: 3,415 chunks and 41,798
 terms. It is BM25 over Arabic and English words, saved locally and excluded
 from git. A risk-policy query returns a risk-management passage, and
-financial-statement queries return financial-statement pages. A neural
-embedding index is still blocked because this Python 3.15 environment has
-no ONNX Runtime, PyTorch, or FAISS wheel.
+financial-statement queries return financial-statement pages. On 2026-10-21
+the project moved to Python 3.13, so local wheels for ONNX Runtime, PyTorch,
+FAISS, and sentence-transformers can now be installed through the
+`retrieval` optional extra. The dense index is not built yet.
 
 The five reports are also recorded in `Data/reports/report_inventory.csv`.
 All five are mixed Arabic and English. File metadata did not include a
@@ -188,8 +192,9 @@ the 5% Arabic character-error-rate limit for OCR evidence.
 ## What the code does not do yet
 
 - The OCR error sample is a digital re-render, not a scanned-page transcription.
-- It does not run a neural embedding model. Python 3.15 has no local wheel
-  for ONNX Runtime, PyTorch, or FAISS.
+- It does not yet run a neural embedding model. The runtime is now
+  Python 3.13, which has local wheels for ONNX Runtime, PyTorch, FAISS,
+  and sentence-transformers, so the dense index is ready to build.
 - It does not yet let an employee accept or edit a finding.
 - It does not store results or reviewer decisions.
 - It does not provide an upload or review screen.

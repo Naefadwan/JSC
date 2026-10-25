@@ -54,28 +54,28 @@ def match_owner_disclosure(
         minimum=5.0,
         require_share_count=require_share_count,
         found_reason=(
-            "The major-shareholder disclosure is in the embedded page, "
-            "and at least one holding is at or above 5%."
+            "تم العثور على إفصاح كبار المساهمين في النص المضمَّن للصفحة، "
+            "وتوجد ملكية بنسبة 5٪ أو أكثر."
         ),
         shares_reason=(
-            "The major-shareholder disclosure is in the embedded page, "
-            "with a holding at or above 5% and a share count."
+            "تم العثور على إفصاح كبار المساهمين في النص المضمَّن للصفحة، "
+            "مع ذكر النسبة وعدد الأسهم."
         ),
         below_reason=(
-            "The major-shareholder wording was found. No parsed holding "
-            "is at or above 5%, so this stays Needs Review."
+            "تمت ملاحظة ألفاظ كبار المساهمين. لم تُحتسب أي ملكية بنسبة 5٪ أو أكثر، "
+            "لذلك تبقى الحالة مراجعة بشرية."
         ),
         missing_number_reason=(
-            "The major-shareholder wording was found. The percentage cells "
-            "were not fully read, so this stays Needs Review."
+            "تمت ملاحظة ألفاظ كبار المساهمين. خلايا النسب لم تُقرأ بالكامل، "
+            "لذلك تبقى الحالة مراجعة بشرية."
         ),
         missing_shares_reason=(
-            "A holding at or above 5% was found. A share count for a major "
-            "holder was not read from the embedded page, so this stays Needs Review."
+            "تم العثور على ملكية بنسبة 5٪ أو أكثر. لم يُقرأ عدد الأسهم المجاور "
+            "لأحد كبار المساهمين من النص المضمَّن، لذلك تبقى الحالة مراجعة بشرية."
         ),
         absent_reason=(
-            "No recognized major-shareholder disclosure was found. "
-            "Unfamiliar wording is Needs Review, not a confirmed miss."
+            "لم يُعثر على إفصاح معترف به لكبار المساهمين. تحتاج الصياغة غير "
+            "المألوفة إلى مراجعة بشرية بدلاً من اعتبارها عدم استيفاء مؤكد."
         ),
         other_cues=CUSTOMER_CUES,
     )
@@ -94,22 +94,23 @@ def match_customer_disclosure(
         minimum=10.0,
         require_share_count=False,
         found_reason=(
-            "The supplier or customer disclosure is in the embedded page, "
-            "and at least one dependence figure is at or above 10%."
+            "تم العثور على إفصاح العملاء أو الموردين الرئيسيين في النص "
+            "المضمَّن للصفحة، مع ذكر نسبة تركز بنسبة 10٪ أو أكثر."
         ),
         shares_reason="",
         below_reason=(
-            "The supplier or customer wording was found. No parsed dependence "
-            "figure is at or above 10%, so this stays Needs Review."
+            "تمت ملاحظة ألفاظ العملاء أو الموردين. لم تُحتسب نسبة اعتماد "
+            "تساوي 10٪ أو أكثر، لذلك تبقى الحالة مراجعة بشرية."
         ),
         missing_number_reason=(
-            "The supplier or customer wording was found. The percentage cells "
-            "were not fully read, so this stays Needs Review."
+            "تمت ملاحظة ألفاظ العملاء أو الموردين. خلايا النسب لم تُقرأ "
+            "بالكامل، لذلك تبقى الحالة مراجعة بشرية."
         ),
         missing_shares_reason="",
         absent_reason=(
-            "No recognized supplier or customer concentration disclosure was found. "
-            "Unfamiliar wording is Needs Review, not a confirmed miss."
+            "لم يُعثر على إفصاح معترف به حول تركز العملاء أو الموردين. "
+            "تحتاج الصياغة غير المألوفة إلى مراجعة بشرية بدلاً من اعتبارها "
+            "عدم استيفاء مؤكد."
         ),
         other_cues=OWNER_CUES,
     )
@@ -157,8 +158,8 @@ def _match(
         return ThresholdMatch(
             status="Needs Review",
             reason=(
-                "The disclosure appeared only in OCR text. OCR text cannot "
-                "support Met until its error rate is within 5%. " + found.reason
+                "ظهر الإفصاح في نص OCR فقط. لا يمكن اعتماد نص OCR دليلاً حتى "
+                "ينخفض معدل الخطأ إلى 5٪ أو أقل. " + found.reason
             ),
             page=found.page,
             excerpt=found.excerpt,
@@ -205,7 +206,7 @@ def _from_page(
         shown = ", ".join(f"{value:g}%" for value in qualifying[:4])
         return ThresholdMatch(
             status="Met",
-            reason=f"{found_reason} Parsed figures: {shown}.",
+            reason=f"{found_reason} النسب المستخرجة: {shown}.",
             page=page_number,
             excerpt=excerpt,
             verified=not from_ocr and excerpt in text,

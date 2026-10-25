@@ -3,6 +3,8 @@
 from fastapi import FastAPI
 
 from jsc_review.api.routes.health import router as health_router
+from jsc_review.api.routes.reviewer import router as reviewer_router
+from jsc_review.api.routes.uploads import router as uploads_router
 from jsc_review.core.logging import configure_logging
 from jsc_review.core.settings import get_settings
 
@@ -19,6 +21,8 @@ def create_app() -> FastAPI:
         description="Local recommendations only; employees make final decisions.",
     )
     application.include_router(health_router)
+    application.include_router(reviewer_router)
+    application.include_router(uploads_router)
     return application
 
 

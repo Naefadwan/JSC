@@ -5,10 +5,8 @@ import re
 from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
-from typing import TypeVar
 
 _WHITESPACE = re.compile(r"\s+")
-_Item = TypeVar("_Item")
 
 
 class OcrMetricError(ValueError):
@@ -63,7 +61,7 @@ def supports_verified_evidence(character_error_rate_value: float | None) -> bool
     return character_error_rate_value <= ocr_max_character_error_rate()
 
 
-def levenshtein(reference: Sequence[_Item], hypothesis: Sequence[_Item]) -> int:
+def levenshtein[Item](reference: Sequence[Item], hypothesis: Sequence[Item]) -> int:
     """Return the edit distance between two strings or token lists."""
 
     if reference == hypothesis:

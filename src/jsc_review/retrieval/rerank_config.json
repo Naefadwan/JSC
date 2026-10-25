@@ -1,0 +1,6 @@
+{
+  "model_name": "BAAI/bge-reranker-v2-m3",
+  "cache_dir": null,
+  "device": "cpu",
+  "max_length": 512
+}

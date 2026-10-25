@@ -7,13 +7,14 @@ name = "jsc-review"
 version = "0.1.0"
 description = "Local-first JSC disclosure and governance review proof of concept"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi>=0.115,<1",
     "jsonschema>=4.23,<5",
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
     "pymupdf>=1.24,<2",
+    "python-multipart>=0.0.20,<1",
     "uvicorn>=0.34,<1",
 ]
 
@@ -24,6 +25,11 @@ dev = [
     "pytest>=8.3,<9",
     "ruff>=0.9,<1",
     "types-jsonschema>=4.23,<5",
+]
+retrieval = [
+    "sentence-transformers>=3.3,<4",
+    "faiss-cpu>=1.9,<2",
+    "onnxruntime>=1.20,<2",
 ]
 
 [tool.setuptools.packages.find]
@@ -36,6 +42,9 @@ jsc_review = [
     "review/model.json",
     "review/prompt_requirement.txt",
     "retrieval/bm25_config.json",
+    "retrieval/dense_config.json",
+    "retrieval/rerank_config.json",
+    "api/static/reviewer.html",
 ]
 
 [tool.pytest.ini_options]
@@ -43,12 +52,13 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"
+exclude = ["Data", ".venv*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = true
 files = ["src", "tests"]

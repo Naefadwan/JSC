@@ -1,0 +1,6 @@
+{
+  "model_name": "BAAI/bge-m3",
+  "cache_dir": null,
+  "device": "cpu",
+  "normalize": false
+}

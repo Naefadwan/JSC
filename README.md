@@ -30,14 +30,17 @@ This scaffold provides:
   storage, and interface work;
 - empty requirements-register and report-inventory templates.
 
-It does not implement a neural embedding model, a reviewer interface, XBRL,
-anomaly detection, or a database. A model result still requires human review.
+It does not yet build XBRL, anomaly detection, or a database. The runtime
+is Python 3.13, so local wheels for ONNX Runtime, PyTorch, FAISS, and
+sentence-transformers are available through the `retrieval` optional extra.
+A model result still requires human review. A local reviewer screen is at
+`http://127.0.0.1:8000/reviewer/` for accepting or changing recommendations.
 OCR text cannot support `Met` until its character error rate is within the
 confirmed limit.
 
 ## Prerequisites
 
-- Python 3.11 or newer
+- Python 3.13
 - PowerShell
 
 No Docker installation is needed or supported in this phase.
@@ -47,10 +50,16 @@ No Docker installation is needed or supported in this phase.
 From the repository root:
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+```
+
+For the local dense retrieval work, add the optional `retrieval` extra:
+
+```powershell
+python -m pip install -e ".[dev,retrieval]"
 ```
 
 Optionally copy `.env.example` to `.env` and adjust only approved local
@@ -63,6 +72,18 @@ python -m uvicorn jsc_review.api.app:app --host 127.0.0.1 --port 8000
 ```
 
 Check `http://127.0.0.1:8000/health`; it returns `{"status":"ok"}`.
+The reviewer screen is at `http://127.0.0.1:8000/reviewer/`. It reads
+`Data/reports/reviews/findings.json` and writes reviewer decisions to
+`data/reviewer/decisions.json`. Both paths stay on this machine and both
+are excluded from version control.
+
+The reviewer screen also accepts PDF uploads: the file is saved to
+`Data/reports/{document_id}.pdf`, a background worker extracts embedded
+text, OCRs the pages that need it, builds a per-document BM25 index,
+judges every selected requirement locally, and appends the new findings
+to the shared file. The UI polls `/reviewer/documents` and reloads
+findings automatically when the job completes. Uploads stay on this
+machine; nothing is sent to any outside service.
 
 ## Verify
 
@@ -87,9 +108,10 @@ Commission infrastructure.
 - Acceptance criterion: a clean local install starts `/health`; tests, linting,
   and type checking pass; the schema and typed model reject `Partially Met`
   and reject `Met` or `Not Met` without verified evidence.
-- Verification evidence (2026-10-15, Python 3.15): editable installation
-  succeeded; 10 tests passed; Ruff lint and format checks passed; strict mypy
-  passed; a live `/health` smoke test returned `{"status":"ok"}`.
+- Verification evidence (2026-10-15, Python 3.15; re-verified 2026-10-21 on
+  Python 3.13.15): editable installation succeeded; 70 tests passed; Ruff
+  lint and format checks passed; strict mypy passed; a live `/health` smoke
+  test returned `{"status":"ok"}`.
 - Peer approval: pending review by Role A.
 
 See `docs/open_questions.md` for decisions that require Commission

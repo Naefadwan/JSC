@@ -9,7 +9,10 @@ import re
 from dataclasses import dataclass
 
 from jsc_review.core.models import Evidence, ReviewResult
-from jsc_review.retrieval.bm25 import Bm25Index
+from jsc_review.documents.normalization import quote_matches_page
+from jsc_review.retrieval.bm25 import Bm25Index, SearchHit
+from jsc_review.retrieval.dense import DenseIndex
+from jsc_review.retrieval.hybrid import reciprocal_rank_fusion
 from jsc_review.review.thresholds import match_customer_disclosure, match_owner_disclosure
 
 _WHITESPACE = re.compile(r"\s+")
@@ -71,8 +74,15 @@ def review_document(
     pages: dict[int, str],
     ocr_pages: dict[int, str],
     index: Bm25Index | None = None,
+    *,
+    dense: DenseIndex | None = None,
 ) -> DocumentFinding:
-    """Review one requirement against one report's extracted pages."""
+    """Review one requirement against one report's extracted pages.
+
+    When ``dense`` is given, retrieval fuses BM25 and dense rankings with
+    reciprocal rank fusion. When ``dense`` is ``None`` behavior is identical
+    to the BM25-only path.
+    """
 
     if requirement.requirement_id in HEADING_VARIANTS:
         result = _review_heading(document_id, requirement, pages, ocr_pages)
@@ -84,10 +94,11 @@ def review_document(
             requirement,
             pages,
             index,
+            dense=dense,
             judged=False,
             reason_found=(
-                "The closest passage is shown. No local model is available to judge "
-                "whether the requirement is met."
+                "يُعرض أقرب مقطع. لا يتوفر نموذج محلي للحكم على ما إذا كان "
+                "المتطلب مستوفى."
             ),
         )
     return DocumentFinding(document_id=document_id, result=result)
@@ -140,7 +151,7 @@ def _review_heading(
         return _result(
             requirement,
             status="Met",
-            reason=f"A recognized heading for this statement was found: {variant}.",
+            reason=f"تم التعرّف على عنوان القائمة التالي: {variant}.",
             evidence=_evidence(
                 document_id,
                 page_number,
@@ -158,8 +169,8 @@ def _review_heading(
             requirement,
             status="Needs Review",
             reason=(
-                f"The heading '{variant}' appeared only in OCR text. "
-                "OCR text cannot support Met until its error rate is within 5%."
+                f"ظهر العنوان '{variant}' في نص OCR فقط. "
+                "لا يمكن اعتماد نص OCR دليلاً حتى ينخفض معدل الخطأ إلى 5٪ أو أقل."
             ),
             evidence=_evidence(
                 document_id,
@@ -176,8 +187,8 @@ def _review_heading(
         requirement,
         status="Needs Review",
         reason=(
-            "No recognized heading was found. Unfamiliar wording is Needs Review, "
-            "not a confirmed miss."
+            "لم يُعثر على عنوان قائمة معترف به. تحتاج الصياغة غير المألوفة إلى "
+            "مراجعة بشرية بدلاً من اعتبارها عدم استيفاء مؤكد."
         ),
         evidence=None,
         confidence=0.3,
@@ -190,20 +201,26 @@ def locate_passage(
     requirement: Requirement,
     pages: dict[int, str],
     index: Bm25Index | None,
+    *,
+    dense: DenseIndex | None = None,
 ) -> LocatedPassage | None:
     """Find the closest passage in one report.
 
     An embedded page is used when one ranks near the requirement. OCR text is
-    used only when no embedded page is in that ranking.
+    used only when no embedded page is in that ranking. When ``dense`` is
+    given, BM25 and dense rankings are fused with reciprocal rank fusion
+    before the embedded-page preference is applied.
     """
 
     if index is None:
         return None
-    hits = index.search(
-        f"{requirement.text_ar} {requirement.text_en}",
-        k=100,
-        document_id=document_id,
-    )
+    query = f"{requirement.text_ar} {requirement.text_en}"
+    bm25_hits: tuple[SearchHit, ...] = index.search(query, k=100, document_id=document_id)
+    if dense is None:
+        hits = bm25_hits
+    else:
+        dense_hits = dense.search(query, k=100, document_id=document_id)
+        hits = reciprocal_rank_fusion([bm25_hits, dense_hits], top_k=100)
     embedded = [hit for hit in hits if hit.extraction_method == "pymupdf-text"]
     chosen = embedded[0] if embedded else (hits[0] if hits else None)
     if chosen is None:
@@ -240,13 +257,15 @@ def apply_model_judgment(
     if passage is None:
         return _missing(requirement)
     page_text = pages.get(passage.page, "")
-    quote_on_page = bool(quote) and quote in page_text and not passage.passage_is_ocr
+    quote_on_page = (
+        bool(quote) and not passage.passage_is_ocr and quote_matches_page(quote, page_text)
+    )
     usable_status = status if status in {"Met", "Not Met", "Needs Review"} else "Needs Review"
     if usable_status in {"Met", "Not Met"} and not quote_on_page:
         usable_status = "Needs Review"
         reason = (
-            "The model judgment was not accepted because its quote is not verified "
-            "on the embedded report page. " + reason
+            "لم يُقبل حكم النموذج لأن الاقتباس لم يُتحقق منه في النص المضمَّن "
+            "لصفحة التقرير. " + reason
         )
     evidence_text = quote if quote_on_page else passage.text
     return _result(
@@ -272,11 +291,12 @@ def _review_retrieved(
     pages: dict[int, str],
     index: Bm25Index | None,
     *,
+    dense: DenseIndex | None = None,
     judged: bool,
     reason_found: str,
 ) -> ReviewResult:
     del judged
-    passage = locate_passage(document_id, requirement, pages, index)
+    passage = locate_passage(document_id, requirement, pages, index, dense=dense)
     if passage is None:
         return _missing(requirement)
     verified = not passage.passage_is_ocr and passage.text in pages.get(passage.page, "")
@@ -301,7 +321,9 @@ def _missing(requirement: Requirement) -> ReviewResult:
     return _result(
         requirement,
         status="Needs Review",
-        reason="No passage in the embedded report text could be tied to this requirement.",
+        reason=(
+            "لم يُعثر في النص المضمَّن للتقرير على مقطع يرتبط بهذا المتطلب."
+        ),
         evidence=None,
         confidence=0.2,
         evaluation_method=_method(requirement),

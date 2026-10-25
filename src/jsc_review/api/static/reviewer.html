@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JSC Reviewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #fafafa;
+    --panel: #ffffff;
+    --border: #d4d4d4;
+    --muted: #666;
+    --accent: #0b5fa5;
+    --accept: #0e7f3b;
+    --change: #a26a00;
+    --defer: #555;
+    --met: #0e7f3b;
+    --not: #a0383a;
+    --review: #a26a00;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: -apple-system, Segoe UI, Roboto, Noto Sans Arabic, sans-serif; background: var(--bg); color: #111; }
+  header { padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 16px; }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  header input { padding: 4px 8px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; }
+  main { display: grid; grid-template-columns: 360px 1fr; height: calc(100vh - 48px); min-height: 0; }
+  body.jobs-visible main { height: calc(100vh - 48px - 110px); }
+  aside { border-right: 1px solid var(--border); background: #fff; overflow-y: auto; }
+  aside .filter { padding: 8px; display: flex; gap: 6px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #fff; z-index: 1; }
+  aside .filter select, aside .filter input { flex: 1; padding: 4px 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; }
+  aside ol { list-style: none; margin: 0; padding: 0; }
+  aside li { border-bottom: 1px solid #eee; padding: 10px 12px; cursor: pointer; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+  aside li:hover { background: #f3f6fb; }
+  aside li.selected { background: #e9f0f9; border-right: 3px solid var(--accent); }
+  aside li .req { font-weight: 600; }
+  aside li .doc { color: var(--muted); font-size: 11px; }
+  aside li .state { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pill.Met { background: #e3f3e8; color: var(--met); }
+  .pill.NotMet { background: #f5e2e3; color: var(--not); }
+  .pill.NeedsReview { background: #f6ecd4; color: var(--review); }
+  .pill.accepted { background: #e3f3e8; color: var(--accept); }
+  .pill.changed { background: #f6ecd4; color: var(--change); }
+  .pill.deferred { background: #ececec; color: var(--defer); }
+  section.detail { padding: 20px; overflow-y: auto; }
+  .empty { color: var(--muted); font-style: italic; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #333; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .meta-row span strong { color: #333; font-weight: 600; }
+  .req-text { font-size: 14px; line-height: 1.6; margin: 6px 0; }
+  .quote { background: #fbf7ee; border-right: 3px solid #d1b96a; padding: 10px 14px; margin-top: 8px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .quote.ltr-border { border-right: none; border-left: 3px solid #d1b96a; }
+  .reason { font-size: 13px; line-height: 1.55; color: #333; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  .controls label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .controls select, .controls input, .controls textarea { padding: 6px 8px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; }
+  .controls textarea { width: 100%; min-height: 70px; resize: vertical; }
+  .buttons { display: flex; gap: 8px; margin-top: 10px; }
+  .buttons button { padding: 8px 16px; border: 1px solid var(--border); background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; color: #333; }
+  .buttons button.accept { color: var(--accept); border-color: var(--accept); }
+  .buttons button.change { color: var(--change); border-color: var(--change); }
+  .buttons button.defer { color: var(--defer); border-color: var(--defer); }
+  .buttons button:hover { filter: brightness(0.95); }
+  .buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .toast { position: fixed; right: 20px; bottom: 20px; background: #333; color: #fff; padding: 10px 14px; border-radius: 4px; font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 10; }
+  .toast.show { opacity: 1; }
+  .notes-saved { color: var(--accept); font-size: 12px; margin-top: 6px; }
+  .reviewer-info { margin-left: auto; display: flex; gap: 8px; align-items: baseline; }
+  .reviewer-info label { font-size: 12px; color: var(--muted); }
+  .decision-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .upload-bar { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+  .upload-bar input[type=file] { font-size: 12px; max-width: 220px; }
+  .upload-bar button { padding: 5px 12px; font-size: 12px; font-weight: 600; border: 1px solid var(--accent); color: var(--accent); background: #fff; border-radius: 4px; cursor: pointer; }
+  .upload-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .upload-bar button:hover:not(:disabled) { background: #eef4fb; }
+  #jobs-panel { background: #fff; border-bottom: 1px solid var(--border); padding: 8px 16px; display: none; }
+  #jobs-panel.show { display: block; }
+  #jobs-panel h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .job { font-size: 12px; padding: 6px 0; border-top: 1px dashed #eee; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .job:first-of-type { border-top: none; }
+  .job .doc-id { font-weight: 600; color: #333; min-width: 180px; }
+  .job .stage { color: var(--muted); }
+  .job .message { color: #333; flex: 1; min-width: 200px; }
+  .job .pill.queued { background: #ececec; color: #555; }
+  .job .pill.running { background: #e3eff8; color: var(--accent); }
+  .job .pill.done { background: #e3f3e8; color: var(--accept); }
+  .job .pill.error { background: #f5e2e3; color: var(--not); }
+</style>
+</head>
+<body>
+<header>
+  <h1>JSC Reviewer</h1>
+  <span class="meta" id="progress">loading…</span>
+  <div class="upload-bar">
+    <input id="upload-file" type="file" accept="application/pdf,.pdf" />
+    <button id="upload-button" type="button">Upload PDF</button>
+    <span id="upload-status" class="meta"></span>
+  </div>
+  <div class="reviewer-info">
+    <label>Reviewer name:
+      <input id="reviewer-name" type="text" placeholder="e.g. A. Hamed" />
+    </label>
+  </div>
+</header>
+<div id="jobs-panel">
+  <h3>Processing jobs</h3>
+  <div id="jobs-list"></div>
+</div>
+<main>
+  <aside>
+    <div class="filter">
+      <select id="filter-status">
+        <option value="">All statuses</option>
+        <option>Met</option>
+        <option>Not Met</option>
+        <option>Needs Review</option>
+      </select>
+      <select id="filter-decision">
+        <option value="">All decisions</option>
+        <option value="undecided">Not reviewed</option>
+        <option value="accepted">Accepted</option>
+        <option value="changed">Changed</option>
+        <option value="deferred">Deferred</option>
+      </select>
+    </div>
+    <ol id="finding-list"></ol>
+  </aside>
+  <section class="detail" id="detail">
+    <p class="empty">Select a finding on the left to review it.</p>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+
+const state = {
+  bundle: null,
+  currentIndex: -1,
+  filterStatus: "",
+  filterDecision: "",
+};
+
+const el = (sel) => document.querySelector(sel);
+const create = (tag, props = {}, children = []) => {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "class") node.className = value;
+    else if (key === "dataset") Object.assign(node.dataset, value);
+    else if (key === "html") node.innerHTML = value;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) {
+    if (child == null) continue;
+    node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+  }
+  return node;
+};
+
+async function loadBundle() {
+  const response = await fetch("/reviewer/findings");
+  if (!response.ok) {
+    el("#detail").innerHTML = "<p class='empty'>Could not load findings. Is the pipeline run complete?</p>";
+    return;
+  }
+  state.bundle = await response.json();
+  renderList();
+  updateProgress();
+  if (state.bundle.findings.length) selectIndex(0);
+}
+
+function filteredIndexes() {
+  if (!state.bundle) return [];
+  const result = [];
+  state.bundle.findings.forEach((finding, index) => {
+    if (state.filterStatus && finding.result.status !== state.filterStatus) return;
+    if (state.filterDecision) {
+      if (state.filterDecision === "undecided" && finding.decision) return;
+      if (state.filterDecision !== "undecided" && finding.decision?.action !== state.filterDecision) return;
+    }
+    result.push(index);
+  });
+  return result;
+}
+
+function renderList() {
+  const list = el("#finding-list");
+  list.innerHTML = "";
+  const indexes = filteredIndexes();
+  for (const index of indexes) {
+    const finding = state.bundle.findings[index];
+    const result = finding.result;
+    const statusClass = result.status.replace(/\s/g, "");
+    const decision = finding.decision;
+    const li = create("li", {
+      dataset: { index: String(index) },
+      onclick: () => selectIndex(index),
+    }, [
+      create("div", { class: "req" }, [`${result.requirement_id}`]),
+      create("div", { class: "doc" }, [finding.document_id]),
+      create("div", { class: "state" }, [
+        create("span", { class: `pill ${statusClass}` }, [result.status]),
+        decision
+          ? create("span", { class: `pill ${decision.action}` }, [decisionLabel(decision.action)])
+          : create("span", { class: "pill deferred" }, ["Not reviewed"]),
+      ]),
+    ]);
+    if (index === state.currentIndex) li.classList.add("selected");
+    list.appendChild(li);
+  }
+}
+
+function decisionLabel(action) {
+  switch (action) {
+    case "accepted": return "Accepted";
+    case "changed": return "Changed";
+    case "deferred": return "Deferred";
+    default: return action;
+  }
+}
+
+function updateProgress() {
+  if (!state.bundle) return;
+  const total = state.bundle.findings.length;
+  const reviewed = state.bundle.findings.filter((f) => f.decision).length;
+  el("#progress").textContent = `${reviewed} of ${total} reviewed`;
+}
+
+function selectIndex(index) {
+  state.currentIndex = index;
+  renderList();
+  renderDetail();
+}
+
+function renderDetail() {
+  const finding = state.bundle.findings[state.currentIndex];
+  const detail = el("#detail");
+  detail.innerHTML = "";
+  if (!finding) {
+    detail.innerHTML = "<p class='empty'>Select a finding on the left.</p>";
+    return;
+  }
+  const result = finding.result;
+  const decision = finding.decision;
+  const evidence = result.evidence;
+  const textAr = state.bundle.requirement_text_ar[result.requirement_id] || "";
+  const textEn = state.bundle.requirement_text_en[result.requirement_id] || "";
+  const statusClass = result.status.replace(/\s/g, "");
+
+  const header = create("div", { class: "card" }, [
+    create("div", { class: "meta-row" }, [
+      create("span", {}, [create("strong", {}, ["Requirement: "]), result.requirement_id]),
+      create("span", {}, [create("strong", {}, ["Document: "]), finding.document_id]),
+      create("span", {}, [create("strong", {}, ["System says: "]), create("span", { class: `pill ${statusClass}` }, [result.status])]),
+      create("span", {}, [create("strong", {}, ["Confidence: "]), String(result.confidence)]),
+      create("span", {}, [create("strong", {}, ["Human review: "]), result.human_review]),
+      create("span", {}, [create("strong", {}, ["Method: "]), result.evaluation_method]),
+    ]),
+  ]);
+
+  const requirement = create("div", { class: "card" }, [
+    create("h2", {}, ["Requirement"]),
+    create("p", { class: "req-text", dir: "rtl" }, [textAr || "(no Arabic text in register)"]),
+    textEn ? create("p", { class: "req-text", dir: "ltr" }, [textEn]) : null,
+  ]);
+
+  const evidenceCard = create("div", { class: "card" }, [
+    create("h2", {}, ["Evidence"]),
+    evidence ? create("div", { class: "meta-row" }, [
+      create("span", {}, [create("strong", {}, ["Page: "]), String(evidence.page)]),
+      create("span", {}, [create("strong", {}, ["Section: "]), evidence.section || "(none)"]),
+      create("span", {}, [create("strong", {}, ["Chunk: "]), evidence.chunk_id]),
+      create("span", {}, [create("strong", {}, ["Verified on embedded page: "]), evidence.verified ? "yes" : "no"]),
+    ]) : null,
+    evidence
+      ? create("div", { class: "quote", dir: "auto" }, [evidence.text])
+      : create("p", { class: "empty" }, ["No evidence attached to this finding."]),
+  ]);
+
+  const reason = create("div", { class: "card" }, [
+    create("h2", {}, ["System reason"]),
+    create("p", { class: "reason", dir: "auto" }, [result.reason]),
+  ]);
+
+  const controls = create("div", { class: "card" }, [
+    create("h2", {}, ["Your decision"]),
+    decision ? create("p", { class: "decision-note" }, [
+      `Last decision: ${decisionLabel(decision.action)} as "${decision.final_status}" by ${decision.reviewer_name} on ${new Date(decision.decided_at).toLocaleString()}.`,
+    ]) : null,
+    create("div", { class: "controls" }, [
+      create("label", {}, [
+        "Final status: ",
+        (() => {
+          const select = create("select", { id: "final-status" }, [
+            create("option", {}, ["Met"]),
+            create("option", {}, ["Not Met"]),
+            create("option", {}, ["Needs Review"]),
+          ]);
+          select.value = decision?.final_status || result.status;
+          return select;
+        })(),
+      ]),
+    ]),
+    create("div", {}, [
+      create("textarea", {
+        id: "reviewer-notes",
+        placeholder: "Notes (required when you change the status).",
+      }, [decision?.reviewer_notes || ""]),
+    ]),
+    create("div", { class: "buttons" }, [
+      create("button", { class: "accept", onclick: () => submitDecision("accepted") }, ["Accept"]),
+      create("button", { class: "change", onclick: () => submitDecision("changed") }, ["Change"]),
+      create("button", { class: "defer", onclick: () => submitDecision("deferred") }, ["Defer to Needs Review"]),
+    ]),
+  ]);
+
+  detail.append(header, requirement, evidenceCard, reason, controls);
+  // Prefill notes
+  const notesInput = el("#reviewer-notes");
+  if (notesInput && decision?.reviewer_notes) notesInput.value = decision.reviewer_notes;
+}
+
+async function submitDecision(action) {
+  const finding = state.bundle.findings[state.currentIndex];
+  if (!finding) return;
+  const reviewerName = el("#reviewer-name").value.trim();
+  if (!reviewerName) {
+    toast("Enter your reviewer name first.");
+    el("#reviewer-name").focus();
+    return;
+  }
+  const finalStatusSelect = el("#final-status");
+  const notesInput = el("#reviewer-notes");
+  let finalStatus = finalStatusSelect.value;
+  if (action === "accepted") finalStatus = finding.result.status;
+  if (action === "deferred") finalStatus = "Needs Review";
+  const notes = notesInput.value.trim();
+  if (action === "changed" && !notes) {
+    toast("Notes are required when you change the status.");
+    notesInput.focus();
+    return;
+  }
+  const response = await fetch("/reviewer/decisions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      document_id: finding.document_id,
+      requirement_id: finding.result.requirement_id,
+      action,
+      final_status: finalStatus,
+      reviewer_name: reviewerName,
+      reviewer_notes: notes,
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    toast(`Save failed: ${text}`);
+    return;
+  }
+  const saved = await response.json();
+  finding.decision = saved;
+  updateProgress();
+  renderList();
+  renderDetail();
+  toast("Saved.");
+}
+
+function toast(message) {
+  const node = el("#toast");
+  node.textContent = message;
+  node.classList.add("show");
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => node.classList.remove("show"), 2200);
+}
+
+el("#filter-status").addEventListener("change", (e) => {
+  state.filterStatus = e.target.value;
+  renderList();
+});
+el("#filter-decision").addEventListener("change", (e) => {
+  state.filterDecision = e.target.value;
+  renderList();
+});
+
+// --- Upload + jobs ----------------------------------------------------------
+
+const uploadState = {
+  seenDone: new Set(),
+  pollTimer: null,
+  pollingErrors: 0,
+};
+
+el("#upload-button").addEventListener("click", async () => {
+  const input = el("#upload-file");
+  const status = el("#upload-status");
+  const button = el("#upload-button");
+  const file = input.files && input.files[0];
+  if (!file) {
+    status.textContent = "Pick a PDF file first.";
+    return;
+  }
+  if (!file.name.toLowerCase().endsWith(".pdf")) {
+    status.textContent = "Only .pdf files are supported.";
+    return;
+  }
+  button.disabled = true;
+  status.textContent = `Uploading ${file.name}...`;
+  try {
+    const body = new FormData();
+    body.append("file", file);
+    const response = await fetch("/reviewer/documents", { method: "POST", body });
+    if (!response.ok) {
+      let detail = "";
+      try { detail = (await response.json()).detail || ""; } catch { /* ignore */ }
+      status.textContent = `Upload failed (${response.status}): ${detail || response.statusText}`;
+      return;
+    }
+    const job = await response.json();
+    status.textContent = `Queued ${job.document_id} (job ${job.job_id.slice(0, 8)}).`;
+    input.value = "";
+    pollJobs();
+  } catch (err) {
+    status.textContent = `Upload error: ${err}`;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function pollJobs() {
+  try {
+    const response = await fetch("/reviewer/documents");
+    if (!response.ok) {
+      uploadState.pollingErrors += 1;
+      return;
+    }
+    uploadState.pollingErrors = 0;
+    const jobs = await response.json();
+    renderJobs(jobs);
+    const active = jobs.filter((job) => job.status === "queued" || job.status === "running");
+    for (const job of jobs) {
+      if (job.status === "done" && !uploadState.seenDone.has(job.job_id)) {
+        uploadState.seenDone.add(job.job_id);
+        toast(`Finished processing ${job.document_id}. Reloading findings.`);
+        loadBundle();
+      }
+    }
+    if (active.length > 0) {
+      uploadState.pollTimer = setTimeout(pollJobs, 2500);
+    } else {
+      uploadState.pollTimer = null;
+    }
+  } catch (_err) {
+    uploadState.pollingErrors += 1;
+    uploadState.pollTimer = setTimeout(pollJobs, 5000);
+  }
+}
+
+function renderJobs(jobs) {
+  const panel = el("#jobs-panel");
+  const list = el("#jobs-list");
+  if (!jobs.length) {
+    panel.classList.remove("show");
+    document.body.classList.remove("jobs-visible");
+    return;
+  }
+  const recent = jobs.slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).slice(0, 5);
+  panel.classList.add("show");
+  document.body.classList.add("jobs-visible");
+  list.innerHTML = "";
+  for (const job of recent) {
+    list.appendChild(create("div", { class: "job" }, [
+      create("span", { class: "doc-id" }, [job.document_id]),
+      create("span", { class: `pill ${job.status}` }, [job.status]),
+      create("span", { class: "stage" }, [job.stage]),
+      create("span", { class: "message" }, [job.message || ""]),
+    ]));
+  }
+}
+
+loadBundle();
+pollJobs();
+</script>
+</body>
+</html>
