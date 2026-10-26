@@ -16,6 +16,15 @@ from jsc_review.core.settings import Settings, get_settings
 def app_with_tmp_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     findings_path = tmp_path / "findings.json"
     decisions_path = tmp_path / "decisions.json"
+    register_path = tmp_path / "requirements_register.csv"
+    register_path.write_text(
+        "requirement_id,checklist,section,requirement_text_ar,requirement_text_en,"
+        "requirement_type,evaluation_method,poc_selected,owner,notes\n"
+        "GOV-001,governance,s1,نص,text,presence,llm,yes,,\n"
+        "GOV-002,governance,s1,نص2,text 2,completeness,llm,,,\n"
+        "DIS-001,disclosure,s2,قائمة,statement,presence,deterministic,yes,,\n",
+        encoding="utf-8",
+    )
     findings = [
         {
             "document_id": "doc1",
@@ -55,6 +64,7 @@ def app_with_tmp_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestC
         return Settings(
             findings_path=findings_path,
             reviewer_decisions_path=decisions_path,
+            requirements_register_path=register_path,
         )
 
     get_settings.cache_clear()
@@ -152,3 +162,72 @@ def test_page_serves_html(app_with_tmp_paths: TestClient) -> None:
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "JSC Reviewer" in response.text
+
+
+# ----------------------------------------- requirements register endpoints ---
+
+
+def test_list_requirements_returns_rows_and_counts(app_with_tmp_paths: TestClient) -> None:
+    """GET /reviewer/requirements lists every row with the current selection state."""
+
+    response = app_with_tmp_paths.get("/reviewer/requirements")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total_count"] == 3
+    assert body["selected_count"] == 2
+    ids = [row["requirement_id"] for row in body["rows"]]
+    assert ids == ["GOV-001", "GOV-002", "DIS-001"]
+    by_id = {row["requirement_id"]: row for row in body["rows"]}
+    assert by_id["GOV-001"]["poc_selected"] is True
+    assert by_id["GOV-002"]["poc_selected"] is False
+
+
+def test_patch_requirements_flips_selection_and_persists(
+    app_with_tmp_paths: TestClient,
+) -> None:
+    """PATCH /reviewer/requirements updates poc_selected on disk."""
+
+    response = app_with_tmp_paths.patch(
+        "/reviewer/requirements",
+        json={"selections": {"GOV-002": True, "DIS-001": False}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["selected_count"] == 2
+    assert body["unknown_requirement_ids"] == []
+    by_id = {row["requirement_id"]: row for row in body["rows"]}
+    assert by_id["GOV-001"]["poc_selected"] is True
+    assert by_id["GOV-002"]["poc_selected"] is True
+    assert by_id["DIS-001"]["poc_selected"] is False
+
+    # Follow-up GET sees the saved state.
+    fresh = app_with_tmp_paths.get("/reviewer/requirements").json()
+    by_id_fresh = {row["requirement_id"]: row for row in fresh["rows"]}
+    assert by_id_fresh["GOV-002"]["poc_selected"] is True
+    assert by_id_fresh["DIS-001"]["poc_selected"] is False
+
+
+def test_patch_requirements_reports_unknown_ids(app_with_tmp_paths: TestClient) -> None:
+    """Unknown ids come back in ``unknown_requirement_ids`` without raising."""
+
+    response = app_with_tmp_paths.patch(
+        "/reviewer/requirements",
+        json={"selections": {"NEW-999": True, "GOV-001": False}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["unknown_requirement_ids"] == ["NEW-999"]
+    by_id = {row["requirement_id"]: row for row in body["rows"]}
+    assert by_id["GOV-001"]["poc_selected"] is False  # the known one still landed
+
+
+def test_patch_requirements_rejects_wrong_payload_shape(
+    app_with_tmp_paths: TestClient,
+) -> None:
+    """Extra fields fail validation so the client cannot touch other columns."""
+
+    response = app_with_tmp_paths.patch(
+        "/reviewer/requirements",
+        json={"selections": {"GOV-001": True}, "evil": {"requirement_text_ar": "pwned"}},
+    )
+    assert response.status_code == 422

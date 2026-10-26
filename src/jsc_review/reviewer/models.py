@@ -39,9 +39,7 @@ class _DecisionCore(BaseModel):
                 "A change requires reviewer notes that record why the status was changed."
             )
         if self.action == "deferred" and self.final_status != "Needs Review":
-            raise ValueError(
-                "A deferred decision keeps the finding in Needs Review."
-            )
+            raise ValueError("A deferred decision keeps the finding in Needs Review.")
         return self
 
 

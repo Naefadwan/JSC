@@ -1,0 +1,34 @@
+{
+  "links": [
+    {
+      "document_id": "163_10162_161_07-04-2026_12-47-10",
+      "company_key": "JOPH",
+      "linked_at": "2026-10-26T09:02:56.806333Z",
+      "linked_by": "auto-cli"
+    },
+    {
+      "document_id": "164_10163_880_31-03-2026_15-01-06",
+      "company_key": "APOT",
+      "linked_at": "2026-10-26T09:02:57.147760Z",
+      "linked_by": "auto-cli"
+    },
+    {
+      "document_id": "131_10130_889_31-03-2026_12-52-11",
+      "company_key": "JOPT",
+      "linked_at": "2026-10-26T09:17:11.864341Z",
+      "linked_by": ""
+    },
+    {
+      "document_id": "1_10000_599_29-03-2026_14-49-00",
+      "company_key": "JOIB",
+      "linked_at": "2026-10-26T09:17:41.253121Z",
+      "linked_by": ""
+    },
+    {
+      "document_id": "217_10216_360_17-03-2026_12-46-33",
+      "company_key": "JPHM",
+      "linked_at": "2026-10-26T09:18:38.330980Z",
+      "linked_by": ""
+    }
+  ]
+}

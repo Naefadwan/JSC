@@ -1,12 +1,16 @@
 """Deterministic threshold checks for ownership and customer disclosures.
 
-A result is Met only when the disclosure wording and a qualifying percentage
-are both in the embedded page text. OCR text stays ineligible for Met.
+A result is Met when the disclosure wording and a qualifying percentage are
+both in the embedded page text, or when the same evidence is in OCR text
+whose character error rate has been measured at or below the policy
+threshold (see ``src/jsc_review/documents/cer_measurement.py``).
 """
 
 import re
 import unicodedata
 from dataclasses import dataclass
+
+from jsc_review.documents.cer_measurement import MeasurementStore
 
 _ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 _SHARES = re.compile(r"(?<![0-9٠-٩])([0-9٠-٩]{1,3}(?:[.,][0-9٠-٩]{3})+)(?![0-9٠-٩])")
@@ -44,6 +48,8 @@ def match_owner_disclosure(
     ocr_pages: dict[int, str],
     *,
     require_share_count: bool,
+    document_id: str | None = None,
+    cer_store: MeasurementStore | None = None,
 ) -> ThresholdMatch:
     """Find a major-shareholder disclosure at or above 5%."""
 
@@ -53,13 +59,14 @@ def match_owner_disclosure(
         cues=OWNER_CUES,
         minimum=5.0,
         require_share_count=require_share_count,
+        document_id=document_id,
+        cer_store=cer_store,
         found_reason=(
             "تم العثور على إفصاح كبار المساهمين في النص المضمَّن للصفحة، "
             "وتوجد ملكية بنسبة 5٪ أو أكثر."
         ),
         shares_reason=(
-            "تم العثور على إفصاح كبار المساهمين في النص المضمَّن للصفحة، "
-            "مع ذكر النسبة وعدد الأسهم."
+            "تم العثور على إفصاح كبار المساهمين في النص المضمَّن للصفحة، مع ذكر النسبة وعدد الأسهم."
         ),
         below_reason=(
             "تمت ملاحظة ألفاظ كبار المساهمين. لم تُحتسب أي ملكية بنسبة 5٪ أو أكثر، "
@@ -84,6 +91,9 @@ def match_owner_disclosure(
 def match_customer_disclosure(
     pages: dict[int, str],
     ocr_pages: dict[int, str],
+    *,
+    document_id: str | None = None,
+    cer_store: MeasurementStore | None = None,
 ) -> ThresholdMatch:
     """Find a supplier or customer disclosure at or above 10%."""
 
@@ -93,6 +103,8 @@ def match_customer_disclosure(
         cues=CUSTOMER_CUES,
         minimum=10.0,
         require_share_count=False,
+        document_id=document_id,
+        cer_store=cer_store,
         found_reason=(
             "تم العثور على إفصاح العملاء أو الموردين الرئيسيين في النص "
             "المضمَّن للصفحة، مع ذكر نسبة تركز بنسبة 10٪ أو أكثر."
@@ -130,6 +142,8 @@ def _match(
     missing_shares_reason: str,
     absent_reason: str,
     other_cues: tuple[str, ...],
+    document_id: str | None = None,
+    cer_store: MeasurementStore | None = None,
 ) -> ThresholdMatch:
     embedded = _best_page(pages, cues, other_cues, minimum, require_share_count)
     if embedded is not None:
@@ -155,6 +169,26 @@ def _match(
             missing_number_reason=missing_number_reason,
             missing_shares_reason=missing_shares_reason,
         )
+        if (
+            found.status == "Met"
+            and document_id is not None
+            and cer_store is not None
+            and cer_store.allows_verified_evidence(document_id, found.page or -1)
+        ):
+            cer = cer_store.cer_for(document_id, found.page or -1) or 0.0
+            promoted_reason = (
+                f"{found.reason} معدل خطأ OCR المقاس على هذه الصفحة "
+                f"{cer * 100:.2f}٪ وهو ضمن الحد المسموح به."
+            )
+            return ThresholdMatch(
+                status="Met",
+                reason=promoted_reason,
+                page=found.page,
+                excerpt=found.excerpt,
+                verified=True,
+                confidence=found.confidence,
+                from_ocr=True,
+            )
         return ThresholdMatch(
             status="Needs Review",
             reason=(

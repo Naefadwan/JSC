@@ -124,6 +124,42 @@ def build_index(chunks: Sequence[IndexedChunk]) -> Bm25Index:
     )
 
 
+def append_chunks(index: Bm25Index, new_chunks: Sequence[IndexedChunk]) -> Bm25Index:
+    """Return a new index that contains every existing chunk plus the new ones.
+
+    Chunks whose ``chunk_id`` already appears in ``index`` are skipped so a
+    repeated upload does not inflate the posting lists.
+    """
+
+    if not new_chunks:
+        return index
+    seen_ids = {chunk.chunk_id for chunk in index.chunks}
+    additions = [chunk for chunk in new_chunks if chunk.chunk_id not in seen_ids]
+    if not additions:
+        return index
+    combined: tuple[IndexedChunk, ...] = index.chunks + tuple(additions)
+    return build_index(combined)
+
+
+def remove_document(index: Bm25Index, document_id: str) -> tuple[Bm25Index, int]:
+    """Return a new index with every chunk for ``document_id`` dropped.
+
+    The second element of the returned tuple is the number of chunks removed,
+    which the caller can surface in a deletion summary. When the index does
+    not reference ``document_id``, the original index is returned unchanged
+    and the count is ``0``.
+    """
+
+    if not index.chunks:
+        return index, 0
+    kept = tuple(chunk for chunk in index.chunks if chunk.document_id != document_id)
+    removed = len(index.chunks) - len(kept)
+    if removed == 0:
+        return index, 0
+    rebuilt = build_index(kept)
+    return rebuilt, removed
+
+
 def load_chunk_directory(directory: Path) -> tuple[IndexedChunk, ...]:
     """Read merged chunk JSON files from a local directory."""
 
@@ -142,6 +178,20 @@ def load_chunk_directory(directory: Path) -> tuple[IndexedChunk, ...]:
                 )
             )
     return tuple(chunks)
+
+
+def save_indexed_chunks(chunks: Sequence[IndexedChunk], directory: Path, document_id: str) -> Path:
+    """Write per-document indexed chunks in the ``load_chunk_directory`` format."""
+
+    directory.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "document_id": document_id,
+        "chunk_count": len(chunks),
+        "chunks": [asdict(chunk) for chunk in chunks],
+    }
+    target = directory / f"{document_id}.json"
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return target
 
 
 def save_index(index: Bm25Index, path: Path) -> Path:

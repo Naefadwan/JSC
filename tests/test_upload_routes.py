@@ -66,9 +66,7 @@ def _pdf_bytes() -> bytes:
     return b"%PDF-1.4\n%minimal\n%EOF\n"
 
 
-def test_upload_queues_a_job_and_persists_the_file(
-    client: TestClient, tmp_path: Path
-) -> None:
+def test_upload_queues_a_job_and_persists_the_file(client: TestClient, tmp_path: Path) -> None:
     """A valid PDF returns 202 with a job and writes the file to disk."""
 
     response = client.post(
@@ -157,3 +155,177 @@ def test_get_job_returns_404_for_unknown_id(client: TestClient) -> None:
 
     response = client.get("/reviewer/documents/missing")
     assert response.status_code == 404
+
+
+def test_cancel_sets_the_flag_on_a_queued_job(client: TestClient) -> None:
+    """POST .../cancel flags a queued job and returns the updated copy."""
+
+    upload = client.post(
+        "/reviewer/documents",
+        files={"file": ("report_a.pdf", _pdf_bytes(), "application/pdf")},
+    )
+    job_id = upload.json()["job_id"]
+
+    response = client.post(f"/reviewer/documents/{job_id}/cancel")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["cancel_requested"] is True
+    assert body["status"] == "queued"
+
+
+def test_cancel_returns_404_for_unknown_job(client: TestClient) -> None:
+    """Cancelling a missing job returns 404."""
+
+    response = client.post("/reviewer/documents/missing/cancel")
+    assert response.status_code == 404
+
+
+def test_cancel_conflicts_with_terminal_job(client: TestClient) -> None:
+    """A finished job cannot be canceled."""
+
+    upload = client.post(
+        "/reviewer/documents",
+        files={"file": ("report_a.pdf", _pdf_bytes(), "application/pdf")},
+    )
+    job_id = upload.json()["job_id"]
+    get_job_store().update(job_id, status="done", stage="done")
+
+    response = client.post(f"/reviewer/documents/{job_id}/cancel")
+    assert response.status_code == 409
+    assert "already" in response.json()["detail"]
+
+
+def test_dismiss_removes_a_terminal_job(client: TestClient) -> None:
+    """DELETE removes a done/error/canceled job and returns the removed copy."""
+
+    upload = client.post(
+        "/reviewer/documents",
+        files={"file": ("report_a.pdf", _pdf_bytes(), "application/pdf")},
+    )
+    job_id = upload.json()["job_id"]
+    get_job_store().update(job_id, status="done", stage="done")
+
+    response = client.delete(f"/reviewer/documents/{job_id}")
+    assert response.status_code == 200
+    assert response.json()["job_id"] == job_id
+
+    follow_up = client.get(f"/reviewer/documents/{job_id}")
+    assert follow_up.status_code == 404
+
+
+def test_dismiss_rejects_active_job(client: TestClient) -> None:
+    """A running job cannot be dismissed and returns 409."""
+
+    upload = client.post(
+        "/reviewer/documents",
+        files={"file": ("report_a.pdf", _pdf_bytes(), "application/pdf")},
+    )
+    job_id = upload.json()["job_id"]
+    get_job_store().update(job_id, status="running", stage="judging")
+
+    response = client.delete(f"/reviewer/documents/{job_id}")
+    assert response.status_code == 409
+    assert "cancel it first" in response.json()["detail"]
+
+
+def test_dismiss_returns_404_for_unknown_job(client: TestClient) -> None:
+    """Dismissing a missing job returns 404."""
+
+    response = client.delete("/reviewer/documents/missing")
+    assert response.status_code == 404
+
+
+def test_list_jobs_exposes_progress_fields(client: TestClient) -> None:
+    """The listing surfaces stage counters and cancel flag for the UI."""
+
+    client.post(
+        "/reviewer/documents",
+        files={"file": ("one.pdf", _pdf_bytes(), "application/pdf")},
+    )
+    jobs = client.get("/reviewer/documents").json()
+    assert jobs
+    job = jobs[0]
+    assert "stage_total" in job
+    assert "stage_done" in job
+    assert "stage_started_at" in job
+    assert "cancel_requested" in job
+
+
+def test_delete_by_id_removes_pdf_and_returns_summary(client: TestClient, tmp_path: Path) -> None:
+    """DELETE /by-id/{document_id} wipes the PDF and reports per-store outcomes."""
+
+    client.post(
+        "/reviewer/documents",
+        files={"file": ("doc_delete.pdf", _pdf_bytes(), "application/pdf")},
+    )
+    pdf_path = tmp_path / "reports" / "doc_delete.pdf"
+    assert pdf_path.exists()
+
+    # Simulate a finished pipeline run by flipping the job to done.
+    jobs = client.get("/reviewer/documents").json()
+    job_id = jobs[0]["job_id"]
+    get_job_store().update(job_id, status="done", stage="done")
+
+    response = client.delete("/reviewer/documents/by-id/doc_delete")
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["document_id"] == "doc_delete"
+    assert len(summary["outcomes"]) == 10  # 9 stores + company_link
+
+    pdf_outcome = next(o for o in summary["outcomes"] if o["name"] == "pdf")
+    assert pdf_outcome["ok"] is True
+    assert pdf_outcome["removed"] == 1
+    assert not pdf_path.exists()
+
+    # Finished job for that doc is dismissed as part of the delete.
+    jobs_after = client.get("/reviewer/documents").json()
+    assert all(job["document_id"] != "doc_delete" for job in jobs_after)
+
+
+def test_delete_by_id_blocks_when_an_upload_is_still_active(
+    client: TestClient,
+) -> None:
+    """An active job for the doc blocks the delete with 409."""
+
+    client.post(
+        "/reviewer/documents",
+        files={"file": ("doc_active.pdf", _pdf_bytes(), "application/pdf")},
+    )
+    jobs = client.get("/reviewer/documents").json()
+    job_id = jobs[0]["job_id"]
+    get_job_store().update(job_id, status="running", stage="judging")
+
+    response = client.delete("/reviewer/documents/by-id/doc_active")
+    assert response.status_code == 409
+    assert "cancel it first" in response.json()["detail"]
+
+
+def test_delete_by_id_handler_rejects_path_traversal() -> None:
+    """The handler's own check refuses document ids containing path separators.
+
+    The router already blocks forward slashes (no route matches), but the
+    handler also validates its input so that a direct call or a client that
+    bypasses URL normalization cannot escape the configured directories.
+    """
+
+    from fastapi import HTTPException
+
+    from jsc_review.api.routes.uploads import delete_document_fully
+    from jsc_review.core.settings import Settings
+
+    settings = Settings()
+    for suspicious in ("..", "foo\\bar", "..\\reports", "foo/bar"):
+        with pytest.raises(HTTPException) as exc:
+            delete_document_fully(suspicious, settings)
+        assert exc.value.status_code == 422
+        assert "Invalid document id" in str(exc.value.detail)
+
+
+def test_delete_by_id_on_unknown_document_is_a_noop(client: TestClient) -> None:
+    """Deleting a doc that was never uploaded still returns a clean summary."""
+
+    response = client.delete("/reviewer/documents/by-id/doc_never_seen")
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["document_id"] == "doc_never_seen"
+    assert all(step["removed"] == 0 for step in summary["outcomes"])

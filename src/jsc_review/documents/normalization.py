@@ -21,9 +21,7 @@ import unicodedata
 # U+0610-U+061A, U+064B-U+065F, U+0670, U+06D6-U+06ED: harakat, hamza above,
 # diacritical marks, Quranic annotation signs. Removing them does not change
 # meaning for a disclosure review.
-_TASHKEEL = re.compile(
-    "[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]"
-)
+_TASHKEEL = re.compile("[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]")
 
 # Tatweel is a stretching character used for justification. It carries no
 # linguistic value.

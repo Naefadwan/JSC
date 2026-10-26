@@ -52,9 +52,7 @@ def test_embedding_settings_rejects_missing_model_name(
     config = tmp_path / "dense_config.json"
     config.write_text(json.dumps({"device": "cpu"}), encoding="utf-8")
 
-    monkeypatch.setattr(
-        embedding, "embedding_settings", embedding.embedding_settings.__wrapped__
-    )
+    monkeypatch.setattr(embedding, "embedding_settings", embedding.embedding_settings.__wrapped__)
     monkeypatch.setattr(embedding, "__file__", str(tmp_path / "embedding.py"))
     with pytest.raises(KeyError):
         embedding.embedding_settings()

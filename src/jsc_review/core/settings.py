@@ -26,10 +26,41 @@ class Settings(BaseSettings):
     reports_dir: Path = Path("Data/reports")
     extracted_dir: Path = Path("Data/reports/extracted")
     ocr_dir: Path = Path("Data/reports/ocr")
-    requirements_register_path: Path = Path(
-        "Data/checklists/requirements_register.csv"
-    )
+    requirements_register_path: Path = Path("Data/checklists/requirements_register.csv")
+    bm25_index_path: Path = Path("indexes/chunk_bm25.json")
+    dense_index_path: Path = Path("indexes/chunk_dense.faiss")
+    update_dense_on_upload: bool = True
     max_upload_mb: int = Field(default=100, ge=1, le=1024)
+    cer_measurements_path: Path = Path("Data/reports/ocr_rerun/cer_measurements.json")
+    chunks_with_ocr_dir: Path = Path("Data/reports/chunks_with_ocr")
+    brief_path: Path = Path("Data/owner_review/brief.md")
+    auto_refresh_brief: bool = True
+    retrieval_gate_measurements_path: Path = Path("Data/reports/retrieval_gate/measurements.json")
+
+    # Company registry (parsed from the local Excel) and the persistent map
+    # from an uploaded document to its company.
+    companies_excel_path: Path = Path("Data/اسماء الشركات التي نريد تدقيقها.xlsx")
+    companies_registry_path: Path = Path("Data/companies/companies.json")
+    document_companies_path: Path = Path("Data/documents/document_companies.json")
+    disclosure_periods_path: Path = Path("Data/compliance/disclosure_periods.json")
+
+    # Auto-link policy. The pipeline runs the deterministic detector against
+    # the first few extracted pages. Links are written only when the top
+    # candidate exceeds the threshold AND leads the runner-up by a margin.
+    auto_link_company: bool = True
+    auto_link_confidence_threshold: float = 0.70
+    auto_link_scan_pages: int = 5
+    auto_link_min_lead_margin: float = 0.25
+
+    # The cross-encoder reranker is opt-in and off by default.
+    #
+    # On the current labeled set the measured retrieval gate shows that
+    # ``fused+dedup+augment`` reaches 87.5% Hit@5, while adding the reranker
+    # drops the same metric to 82.1%. Running the reranker therefore both
+    # slows every upload and lowers top-k recall, so production stays with
+    # the lighter pipeline. Turning this flag back on reloads the local
+    # cross-encoder once per process via ``shared_cross_encoder()``.
+    use_reranker: bool = False
 
 
 @lru_cache

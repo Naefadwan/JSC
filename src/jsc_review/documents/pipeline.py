@@ -11,34 +11,63 @@ partial progress to the reviewer screen.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from jsc_review.documents.cer_measurement import MeasurementStore, load_measurements
 from jsc_review.documents.chunk import chunk_pdf
 from jsc_review.documents.extract import extract_pdf, save_extraction
 from jsc_review.documents.ocr import OcrEngineError, ocr_page_record, recognize_pdf_page
-from jsc_review.retrieval.bm25 import Bm25Index, IndexedChunk, build_index
-from jsc_review.review.findings import (
-    Requirement,
-    apply_model_judgment,
-    locate_passage,
-    review_document,
+from jsc_review.retrieval import bm25 as bm25_module
+from jsc_review.retrieval import dense as dense_module
+from jsc_review.retrieval.bm25 import (
+    Bm25Index,
+    IndexedChunk,
+    build_index,
+    save_indexed_chunks,
 )
-from jsc_review.review.ollama import LocalModelError, judge_passage
+from jsc_review.retrieval.reranker import CrossEncoder
+from jsc_review.review.findings import Requirement, judge_requirement
 
+_LOGGER = logging.getLogger(__name__)
 _INVALID_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 Progress = Callable[[str, str], None]
 """A callback that receives (stage, message) during processing."""
 
+StageProgress = Callable[[str, int | None, int | None], None]
+"""A callback that receives (stage, done, total) between stage boundaries.
+
+``done`` and ``total`` may both be ``None`` to indicate the start of a stage
+whose size is not yet known. A value of ``(stage, 0, N)`` marks the beginning
+of a bounded stage; ``(stage, i, N)`` marks a tick inside it.
+"""
+
+CancelCheck = Callable[[], bool]
+"""A callable that returns True when the pipeline should abort cleanly."""
+
+AutolinkHook = Callable[[str, tuple[tuple[int, str], ...]], None]
+"""Receives ``(document_id, pages)`` after extraction to decide a company link.
+
+``pages`` is a tuple of ``(page_number, raw_text)`` pairs. The hook owns the
+decision policy (threshold, confirmation, logging). It must not raise; the
+pipeline swallows exceptions so autolink can never fail a review.
+"""
+
 _findings_lock = threading.Lock()
+_global_index_lock = threading.Lock()
 
 
 class UploadError(ValueError):
     """Raised when an uploaded file cannot be accepted."""
+
+
+class UploadCanceled(RuntimeError):
+    """Raised by the pipeline when a cancel request is observed."""
 
 
 @dataclass(frozen=True)
@@ -96,6 +125,21 @@ def _notify(progress: Progress | None, stage: str, message: str) -> None:
         progress(stage, message)
 
 
+def _tick(
+    stage_progress: StageProgress | None,
+    stage: str,
+    done: int | None,
+    total: int | None,
+) -> None:
+    if stage_progress is not None:
+        stage_progress(stage, done, total)
+
+
+def _check_cancel(is_canceled: CancelCheck | None) -> None:
+    if is_canceled is not None and is_canceled():
+        raise UploadCanceled("Processing was canceled by the reviewer")
+
+
 def process_uploaded_pdf(
     pdf_path: Path,
     *,
@@ -104,37 +148,85 @@ def process_uploaded_pdf(
     ocr_dir: Path,
     findings_path: Path,
     progress: Progress | None = None,
+    stage_progress: StageProgress | None = None,
+    is_canceled: CancelCheck | None = None,
+    bm25_index_path: Path | None = None,
+    dense_index_path: Path | None = None,
+    update_dense: bool = True,
+    reranker: CrossEncoder | None = None,
+    cer_measurements_path: Path | None = None,
+    chunks_with_ocr_dir: Path | None = None,
+    autolink_hook: AutolinkHook | None = None,
 ) -> ProcessedDocument:
-    """Run the full local pipeline for one PDF and append findings in place."""
+    """Run the full local pipeline for one PDF and append findings in place.
+
+    ``reranker`` is passed through to :func:`judge_requirement`. Production
+    leaves it ``None`` by default because the measured retrieval gate shows
+    the cross-encoder lowers top-k recall on the current label set; the
+    caller flips it on by reading ``Settings.use_reranker`` and loading
+    :func:`jsc_review.retrieval.reranker.shared_cross_encoder`.
+    """
 
     document_id = pdf_path.stem
+    cer_store = load_measurements(cer_measurements_path)
+
+    _check_cancel(is_canceled)
     _notify(progress, "extracting", "قراءة النص المضمَّن من ملف PDF")
+    _tick(stage_progress, "extracting", None, None)
     extracted = extract_pdf(pdf_path)
     save_extraction(extracted, extracted_dir)
     pages: dict[int, str] = {page.page: page.text for page in extracted.pages}
     ocr_candidates = [page for page in extracted.pages if page.needs_ocr]
 
+    # Auto-link the document to a company based on the extracted text.
+    # Hook is optional so the pipeline keeps working without a registry.
+    if autolink_hook is not None:
+        try:
+            autolink_hook(document_id, tuple((p.page, p.text) for p in extracted.pages))
+        except Exception:  # noqa: BLE001
+            # Autolink is a side activity and must never fail the review run.
+            _LOGGER.exception("Autolink hook failed for %s", document_id)
+
+    _check_cancel(is_canceled)
     _notify(
         progress,
         "ocr",
         f"صفحات تحتاج إلى OCR: {len(ocr_candidates)} من {len(extracted.pages)}",
     )
-    ocr_pages = _run_ocr(document_id, pdf_path, ocr_candidates, ocr_dir, progress)
+    _tick(stage_progress, "ocr", 0, len(ocr_candidates))
+    ocr_pages = _run_ocr(
+        document_id,
+        pdf_path,
+        ocr_candidates,
+        ocr_dir,
+        progress,
+        stage_progress=stage_progress,
+        is_canceled=is_canceled,
+    )
 
+    _check_cancel(is_canceled)
     _notify(progress, "indexing", "بناء فهرس BM25 للمستند")
+    _tick(stage_progress, "indexing", None, None)
     chunked = chunk_pdf(pdf_path)
     index_chunks = _chunks_for_index(chunked.chunks, ocr_pages)
     index = build_index(index_chunks) if index_chunks else None
+    if chunks_with_ocr_dir is not None and index_chunks:
+        save_indexed_chunks(index_chunks, chunks_with_ocr_dir, document_id)
 
+    _check_cancel(is_canceled)
     _notify(progress, "judging", f"حكم {len(requirements)} متطلب")
+    _tick(stage_progress, "judging", 0, len(requirements))
     appended = 0
     for position, requirement in enumerate(requirements, start=1):
+        _check_cancel(is_canceled)
         record = _review_one(
             document_id=document_id,
             requirement=requirement,
             pages=pages,
             ocr_pages=ocr_pages,
             index=index,
+            reranker=reranker,
+            cer_store=cer_store,
         )
         _append_finding(findings_path, record)
         appended += 1
@@ -143,8 +235,21 @@ def process_uploaded_pdf(
             "judging",
             f"{requirement.requirement_id} ({position}/{len(requirements)})",
         )
+        _tick(stage_progress, "judging", position, len(requirements))
+
+    if bm25_index_path is not None and index_chunks:
+        _check_cancel(is_canceled)
+        _tick(stage_progress, "indexing_global", None, None)
+        _sync_global_indexes(
+            new_chunks=index_chunks,
+            bm25_index_path=bm25_index_path,
+            dense_index_path=dense_index_path,
+            update_dense=update_dense,
+            progress=progress,
+        )
 
     _notify(progress, "done", "اكتملت المعالجة")
+    _tick(stage_progress, "done", None, None)
     return ProcessedDocument(
         document_id=document_id,
         pdf_path=pdf_path,
@@ -156,18 +261,93 @@ def process_uploaded_pdf(
     )
 
 
+def _sync_global_indexes(
+    *,
+    new_chunks: Sequence[IndexedChunk],
+    bm25_index_path: Path,
+    dense_index_path: Path | None,
+    update_dense: bool,
+    progress: Progress | None,
+) -> None:
+    """Append new chunks to the global BM25 and (optional) dense indexes.
+
+    This is best-effort. A missing BM25 file is skipped. A missing or
+    unloadable dense index is skipped. An encoder-load failure is skipped.
+    Everything is reported through the progress callback.
+    """
+
+    with _global_index_lock:
+        if not bm25_index_path.exists():
+            _notify(
+                progress,
+                "indexing_global",
+                "فهرس BM25 العام غير موجود. تخطي التحديث العام.",
+            )
+            return
+        _notify(progress, "indexing_global", "تحديث فهرس BM25 العام")
+        try:
+            global_bm25 = bm25_module.load_index(bm25_index_path)
+            updated = bm25_module.append_chunks(global_bm25, list(new_chunks))
+            bm25_module.save_index(updated, bm25_index_path)
+            added = len(updated.chunks) - len(global_bm25.chunks)
+            _notify(
+                progress,
+                "indexing_global",
+                f"أُضيف {added} مقطع إلى فهرس BM25 العام",
+            )
+        except (OSError, ValueError, KeyError) as exc:
+            _notify(
+                progress,
+                "indexing_global",
+                f"فشل تحديث فهرس BM25 العام: {exc}",
+            )
+            return
+
+        if not update_dense or dense_index_path is None or not dense_index_path.exists():
+            return
+        _notify(progress, "indexing_global", "ترميز وتحديث فهرس BGE-M3 العام")
+        try:
+            global_dense = dense_module.load_index(dense_index_path)
+            from jsc_review.retrieval.embedding import (
+                SentenceTransformerEncoder,
+                embedding_settings,
+            )
+
+            encoder = SentenceTransformerEncoder(embedding_settings())
+            updated_dense = dense_module.append_chunks(
+                global_dense, list(new_chunks), encoder, batch_size=8
+            )
+            dense_module.save_index(updated_dense, dense_index_path)
+            added = len(updated_dense.chunks) - len(global_dense.chunks)
+            _notify(
+                progress,
+                "indexing_global",
+                f"أُضيف {added} مقطع إلى فهرس BGE-M3 العام",
+            )
+        except Exception as exc:  # noqa: BLE001
+            _notify(
+                progress,
+                "indexing_global",
+                f"فشل تحديث فهرس BGE-M3 العام (تجاوز): {exc}",
+            )
+
+
 def _run_ocr(
     document_id: str,
     pdf_path: Path,
     candidates: Sequence[object],
     ocr_dir: Path,
     progress: Progress | None,
+    *,
+    stage_progress: StageProgress | None = None,
+    is_canceled: CancelCheck | None = None,
 ) -> dict[int, str]:
     """Run OCR for the pages that embedded extraction left short."""
 
     ocr_pages: dict[int, str] = {}
     page_records: list[dict[str, object]] = []
     for position, candidate in enumerate(candidates, start=1):
+        _check_cancel(is_canceled)
         page_number = getattr(candidate, "page", None)
         if not isinstance(page_number, int):
             continue
@@ -180,12 +360,12 @@ def _run_ocr(
             text = recognize_pdf_page(pdf_path, page_number)
         except OcrEngineError as exc:
             _notify(progress, "ocr", f"فشل OCR صفحة {page_number}: {exc}")
+            _tick(stage_progress, "ocr", position, len(candidates))
             continue
         ocr_pages[page_number] = text
-        record = ocr_page_record(
-            document_id=document_id, page_number=page_number, text=text
-        )
+        record = ocr_page_record(document_id=document_id, page_number=page_number, text=text)
         page_records.append(asdict(record))
+        _tick(stage_progress, "ocr", position, len(candidates))
 
     if page_records:
         ocr_dir.mkdir(parents=True, exist_ok=True)
@@ -216,9 +396,7 @@ def _chunks_for_index(
                 page=page,
                 section=str(getattr(chunk, "section", "")),
                 text=text,
-                extraction_method=str(
-                    getattr(chunk, "extraction_method", "pymupdf-text")
-                ),
+                extraction_method=str(getattr(chunk, "extraction_method", "pymupdf-text")),
             )
         )
     document_id = indexed[0].document_id if indexed else ""
@@ -245,44 +423,22 @@ def _review_one(
     pages: dict[int, str],
     ocr_pages: dict[int, str],
     index: Bm25Index | None,
+    reranker: CrossEncoder | None = None,
+    cer_store: MeasurementStore | None = None,
 ) -> dict[str, object]:
     """Review one requirement; call the local model when needed."""
 
-    if requirement.evaluation_method != "llm":
-        finding = review_document(
-            document_id, requirement, pages, ocr_pages, index, dense=None
-        )
-        return {"document_id": document_id, "result": finding.result.model_dump()}
-
-    passage = locate_passage(document_id, requirement, pages, index, dense=None)
-    if passage is None:
-        finding = review_document(
-            document_id, requirement, pages, ocr_pages, index, dense=None
-        )
-        return {"document_id": document_id, "result": finding.result.model_dump()}
-    try:
-        judgment = judge_passage(
-            requirement, passage.text, passage_is_ocr=passage.passage_is_ocr
-        )
-    except LocalModelError as exc:
-        finding = review_document(
-            document_id, requirement, pages, ocr_pages, index, dense=None
-        )
-        result = finding.result.model_copy(
-            update={"reason": f"{finding.result.reason} خطأ النموذج المحلي: {exc}"}
-        )
-        return {"document_id": document_id, "result": result.model_dump()}
-    accepted = apply_model_judgment(
+    result = judge_requirement(
         document_id,
         requirement,
-        passage,
-        status=judgment.status,
-        reason=judgment.reason,
-        quote=judgment.quote,
-        confidence=judgment.confidence,
-        pages=pages,
+        pages,
+        ocr_pages,
+        index,
+        dense=None,
+        reranker=reranker,
+        cer_store=cer_store,
     )
-    return {"document_id": document_id, "result": accepted.model_dump()}
+    return {"document_id": document_id, "result": result.model_dump()}
 
 
 def _append_finding(findings_path: Path, record: dict[str, object]) -> None:
@@ -300,7 +456,5 @@ def _append_finding(findings_path: Path, record: dict[str, object]) -> None:
                 existing = []
         existing.append(record)
         temp_path = findings_path.with_suffix(findings_path.suffix + ".tmp")
-        temp_path.write_text(
-            json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        temp_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
         temp_path.replace(findings_path)

@@ -1,0 +1,14 @@
+{
+  "periods": [
+    {
+      "period_id": "Q1-2026",
+      "description": "Q1 2026 interim disclosure (sample period)",
+      "due_date": "2026-04-30"
+    },
+    {
+      "period_id": "Q4-2025",
+      "description": "Annual disclosure for fiscal year 2025",
+      "due_date": "2026-03-31"
+    }
+  ]
+}

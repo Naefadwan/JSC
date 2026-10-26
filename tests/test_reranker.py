@@ -82,9 +82,42 @@ def test_reranker_settings_rejects_missing_model_name(
     config = tmp_path / "rerank_config.json"
     config.write_text(json.dumps({"device": "cpu"}), encoding="utf-8")
 
-    monkeypatch.setattr(
-        reranker, "reranker_settings", reranker.reranker_settings.__wrapped__
-    )
+    monkeypatch.setattr(reranker, "reranker_settings", reranker.reranker_settings.__wrapped__)
     monkeypatch.setattr(reranker, "__file__", str(tmp_path / "reranker.py"))
     with pytest.raises(KeyError):
         reranker.reranker_settings()
+
+
+def test_shared_cross_encoder_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The shared loader builds one cross-encoder and reuses it.
+
+    The reranker is opt-in on the production path. When a reviewer flips the
+    setting on, every upload grabs the same encoder instance so weights are
+    not reloaded per requirement. This test uses a lightweight stand-in to
+    avoid loading sentence-transformers in CI.
+    """
+
+    from jsc_review.retrieval import reranker
+
+    build_count = {"n": 0}
+
+    class _Stub:
+        def predict(self, pairs: Sequence[tuple[str, str]]) -> NDArray[np.float32]:
+            del pairs
+            return np.asarray([], dtype=np.float32)
+
+    def fake_builder(_settings: object) -> _Stub:
+        build_count["n"] += 1
+        return _Stub()
+
+    reranker.shared_cross_encoder.cache_clear()
+    monkeypatch.setattr(reranker, "SentenceTransformerCrossEncoder", fake_builder)
+
+    try:
+        first = reranker.shared_cross_encoder()
+        second = reranker.shared_cross_encoder()
+    finally:
+        reranker.shared_cross_encoder.cache_clear()
+
+    assert first is second
+    assert build_count["n"] == 1

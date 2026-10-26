@@ -92,3 +92,17 @@ def reranker_settings() -> RerankerSettings:
         device=str(payload.get("device", "cpu")),
         max_length=int(payload.get("max_length", 512)),
     )
+
+
+@lru_cache
+def shared_cross_encoder() -> CrossEncoder:
+    """Return a process-wide cross-encoder loaded from the local cache.
+
+    The weights are read once per process and reused across uploads so that
+    opting the reranker back in (``settings.use_reranker``) does not reload
+    the model on every requirement. The sentence-transformers import stays
+    inside :class:`SentenceTransformerCrossEncoder` so machines that keep
+    the reranker off never touch the heavy library.
+    """
+
+    return SentenceTransformerCrossEncoder(reranker_settings())

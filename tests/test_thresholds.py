@@ -1,5 +1,6 @@
 """Tests for the ownership and customer threshold checks."""
 
+from jsc_review.documents.cer_measurement import MeasurementStore, PageMeasurement
 from jsc_review.review.findings import Requirement, review_document
 
 
@@ -10,6 +11,27 @@ def _requirement(requirement_id: str) -> Requirement:
         text_ar="كبار مالكي الأسهم",
         text_en="Major shareholders",
         evaluation_method="deterministic",
+    )
+
+
+def _measurement_store(
+    document_id: str, page: int, *, cer: float, engine: str = "indra"
+) -> MeasurementStore:
+    return MeasurementStore(
+        threshold=0.05,
+        measurements=(
+            PageMeasurement(
+                document_id=document_id,
+                page=page,
+                engine=engine,
+                cer=cer,
+                wer=None,
+                reference_chars=100,
+                hypothesis_chars=100,
+                verified_evidence_eligible=cer <= 0.05,
+                measured_at="2026-10-25T00:00:00+00:00",
+            ),
+        ),
     )
 
 
@@ -72,6 +94,53 @@ def test_owner_disclosure_found_only_by_ocr_cannot_be_met() -> None:
     assert finding.result.status == "Needs Review"
     assert finding.result.evidence is not None
     assert finding.result.evidence.verified is False
+
+
+def test_owner_disclosure_from_ocr_is_promoted_when_cer_is_measured_low() -> None:
+    store = _measurement_store("report", 2, cer=0.03)
+
+    finding = review_document(
+        "report",
+        _requirement("DIS-010"),
+        pages={2: ""},
+        ocr_pages={2: "كبار المساهمين %28 23,294,614"},
+        cer_store=store,
+    )
+
+    assert finding.result.status == "Met"
+    assert finding.result.evidence is not None
+    assert finding.result.evidence.verified is True
+    assert "3.00" in finding.result.reason or "3,00" in finding.result.reason
+
+
+def test_owner_disclosure_from_ocr_stays_review_when_cer_too_high() -> None:
+    store = _measurement_store("report", 2, cer=0.4)
+
+    finding = review_document(
+        "report",
+        _requirement("DIS-010"),
+        pages={2: ""},
+        ocr_pages={2: "كبار المساهمين %28 23,294,614"},
+        cer_store=store,
+    )
+
+    assert finding.result.status == "Needs Review"
+    assert finding.result.evidence is not None
+    assert finding.result.evidence.verified is False
+
+
+def test_measurement_for_a_different_page_does_not_promote_ocr() -> None:
+    store = _measurement_store("report", 99, cer=0.01)
+
+    finding = review_document(
+        "report",
+        _requirement("DIS-010"),
+        pages={2: ""},
+        ocr_pages={2: "كبار المساهمين %28 23,294,614"},
+        cer_store=store,
+    )
+
+    assert finding.result.status == "Needs Review"
 
 
 def test_customer_dependence_at_or_above_ten_percent_is_met() -> None:

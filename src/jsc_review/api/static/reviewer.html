@@ -4,131 +4,976 @@
 <meta charset="utf-8" />
 <title>JSC Reviewer</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" />
 <style>
   :root {
-    --bg: #fafafa;
+    --bg: #f6f7f9;
     --panel: #ffffff;
-    --border: #d4d4d4;
-    --muted: #666;
-    --accent: #0b5fa5;
-    --accept: #0e7f3b;
-    --change: #a26a00;
-    --defer: #555;
-    --met: #0e7f3b;
-    --not: #a0383a;
-    --review: #a26a00;
+    --panel-elevated: #ffffff;
+    --border: #e4e7ec;
+    --border-strong: #d0d5dd;
+    --text: #0b1324;
+    --text-muted: #566273;
+    --text-faint: #8691a2;
+    --accent: #2563eb;
+    --accent-soft: #eef4ff;
+    --accent-strong: #1d4ed8;
+    --focus-ring: rgba(37, 99, 235, 0.18);
+
+    --met-bg: #ecfdf5;
+    --met-fg: #047857;
+    --notmet-bg: #fef2f2;
+    --notmet-fg: #b91c1c;
+    --review-bg: #fffbeb;
+    --review-fg: #a16207;
+
+    --accept: #047857;
+    --change: #a16207;
+    --defer: #475467;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-pill: 999px;
+
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+    --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.06);
+    --shadow-focus: 0 0 0 3px var(--focus-ring);
+
+    --header-h: 56px;
+    --jobs-h: 180px;
+
+    --font-sans: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+                 "IBM Plex Sans Arabic", "Noto Sans Arabic", "Segoe UI Arabic",
+                 "Tahoma", sans-serif;
+    --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Mono", "Menlo",
+                 "Consolas", monospace;
   }
+
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; font-family: -apple-system, Segoe UI, Roboto, Noto Sans Arabic, sans-serif; background: var(--bg); color: #111; }
-  header { padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 16px; }
-  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
-  header .meta { color: var(--muted); font-size: 12px; }
-  header input { padding: 4px 8px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; }
-  main { display: grid; grid-template-columns: 360px 1fr; height: calc(100vh - 48px); min-height: 0; }
-  body.jobs-visible main { height: calc(100vh - 48px - 110px); }
-  aside { border-right: 1px solid var(--border); background: #fff; overflow-y: auto; }
-  aside .filter { padding: 8px; display: flex; gap: 6px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #fff; z-index: 1; }
-  aside .filter select, aside .filter input { flex: 1; padding: 4px 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; }
-  aside ol { list-style: none; margin: 0; padding: 0; }
-  aside li { border-bottom: 1px solid #eee; padding: 10px 12px; cursor: pointer; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
-  aside li:hover { background: #f3f6fb; }
-  aside li.selected { background: #e9f0f9; border-right: 3px solid var(--accent); }
-  aside li .req { font-weight: 600; }
-  aside li .doc { color: var(--muted); font-size: 11px; }
-  aside li .state { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-  .pill.Met { background: #e3f3e8; color: var(--met); }
-  .pill.NotMet { background: #f5e2e3; color: var(--not); }
-  .pill.NeedsReview { background: #f6ecd4; color: var(--review); }
-  .pill.accepted { background: #e3f3e8; color: var(--accept); }
-  .pill.changed { background: #f6ecd4; color: var(--change); }
-  .pill.deferred { background: #ececec; color: var(--defer); }
-  section.detail { padding: 20px; overflow-y: auto; }
-  .empty { color: var(--muted); font-style: italic; }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
-  .card h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #333; }
-  .meta-row { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .meta-row span strong { color: #333; font-weight: 600; }
-  .req-text { font-size: 14px; line-height: 1.6; margin: 6px 0; }
-  .quote { background: #fbf7ee; border-right: 3px solid #d1b96a; padding: 10px 14px; margin-top: 8px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
-  .quote.ltr-border { border-right: none; border-left: 3px solid #d1b96a; }
-  .reason { font-size: 13px; line-height: 1.55; color: #333; }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
-  .controls label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-  .controls select, .controls input, .controls textarea { padding: 6px 8px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit; }
-  .controls textarea { width: 100%; min-height: 70px; resize: vertical; }
-  .buttons { display: flex; gap: 8px; margin-top: 10px; }
-  .buttons button { padding: 8px 16px; border: 1px solid var(--border); background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; color: #333; }
-  .buttons button.accept { color: var(--accept); border-color: var(--accept); }
-  .buttons button.change { color: var(--change); border-color: var(--change); }
-  .buttons button.defer { color: var(--defer); border-color: var(--defer); }
-  .buttons button:hover { filter: brightness(0.95); }
-  .buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .toast { position: fixed; right: 20px; bottom: 20px; background: #333; color: #fff; padding: 10px 14px; border-radius: 4px; font-size: 13px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 10; }
-  .toast.show { opacity: 1; }
-  .notes-saved { color: var(--accept); font-size: 12px; margin-top: 6px; }
-  .reviewer-info { margin-left: auto; display: flex; gap: 8px; align-items: baseline; }
-  .reviewer-info label { font-size: 12px; color: var(--muted); }
-  .decision-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
-  .upload-bar { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-  .upload-bar input[type=file] { font-size: 12px; max-width: 220px; }
-  .upload-bar button { padding: 5px 12px; font-size: 12px; font-weight: 600; border: 1px solid var(--accent); color: var(--accent); background: #fff; border-radius: 4px; cursor: pointer; }
-  .upload-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .upload-bar button:hover:not(:disabled) { background: #eef4fb; }
-  #jobs-panel { background: #fff; border-bottom: 1px solid var(--border); padding: 8px 16px; display: none; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.005em;
+  }
+  code, kbd, samp, pre, .mono { font-family: var(--font-mono); font-feature-settings: "zero" 1; }
+
+  /* ------------------------------------------------------------- header -- */
+  header {
+    height: var(--header-h);
+    padding: 0 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent) 0%, #1e40af 100%);
+    display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 13px;
+    box-shadow: var(--shadow-sm);
+  }
+  .brand h1 {
+    margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .brand .subtitle { font-size: 11px; color: var(--text-faint); line-height: 1; }
+
+  .progress-chip {
+    font-size: 12px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+  .toolbar .divider { width: 1px; height: 24px; background: var(--border); }
+
+  /* --------------------------------------------------------------- inputs */
+  .input, select.input, input[type=text].input, input[type=file].input {
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--shadow-focus);
+  }
+  input[type=file].input {
+    padding: 5px 8px;
+    font-size: 12px;
+    max-width: 240px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 76px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.55;
+    resize: vertical;
+    background: #fff;
+    color: var(--text);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+
+  /* -------------------------------------------------------------- buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background-color .15s ease, border-color .15s ease,
+                color .15s ease, box-shadow .15s ease, transform .05s ease;
+    user-select: none;
+  }
+  .btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .btn.primary {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+
+  .btn.ghost {
+    background: transparent; color: var(--text); border-color: var(--border-strong);
+  }
+  .btn.ghost:hover:not(:disabled) { background: #f1f3f6; border-color: var(--border-strong); }
+
+  .btn.accept { color: var(--accept); border-color: #a7f3d0; background: #ecfdf5; }
+  .btn.accept:hover:not(:disabled) { background: #d1fae5; }
+  .btn.change { color: var(--change); border-color: #fde68a; background: #fffbeb; }
+  .btn.change:hover:not(:disabled) { background: #fef3c7; }
+  .btn.defer  { color: var(--defer); border-color: #e4e7ec; background: #f4f5f7; }
+  .btn.defer:hover:not(:disabled)  { background: #e9ebee; }
+
+  .btn.current { box-shadow: inset 0 0 0 2px currentColor; }
+
+  /* ---------------------------------------------------------- jobs panel */
+  #jobs-panel {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: none;
+    max-height: var(--jobs-h);
+    overflow-y: auto;
+  }
   #jobs-panel.show { display: block; }
-  #jobs-panel h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
-  .job { font-size: 12px; padding: 6px 0; border-top: 1px dashed #eee; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  #jobs-panel .jobs-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  #jobs-panel h3 {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  #jobs-panel .jobs-summary { font-size: 11px; color: var(--text-faint); }
+  .job {
+    font-size: 12px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns:
+      minmax(180px, 1fr)   /* doc id        */
+      auto                 /* status pill   */
+      auto                 /* stage         */
+      minmax(140px, 1.5fr) /* message       */
+      minmax(220px, auto)  /* company picker*/
+      auto;                /* actions       */
+    gap: 10px 14px;
+    align-items: center;
+  }
   .job:first-of-type { border-top: none; }
-  .job .doc-id { font-weight: 600; color: #333; min-width: 180px; }
-  .job .stage { color: var(--muted); }
-  .job .message { color: #333; flex: 1; min-width: 200px; }
-  .job .pill.queued { background: #ececec; color: #555; }
-  .job .pill.running { background: #e3eff8; color: var(--accent); }
-  .job .pill.done { background: #e3f3e8; color: var(--accept); }
-  .job .pill.error { background: #f5e2e3; color: var(--not); }
+  .job .doc-id { font-weight: 600; color: var(--text); font-family: var(--font-mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job .stage { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .job .message { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job .actions { display: flex; gap: 6px; justify-self: end; }
+  .job .btn.compact {
+    height: 24px; padding: 0 10px; font-size: 11px; font-weight: 500;
+  }
+  .job .btn.compact.danger {
+    color: var(--notmet-fg); border-color: #fecaca;
+  }
+  .job .btn.compact.danger:hover:not(:disabled) {
+    background: var(--notmet-bg);
+  }
+  .job .progress-wrap {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .job .progress-bar {
+    position: relative;
+    flex: 1;
+    height: 6px;
+    background: #eef0f3;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .job .progress-bar .fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width .25s ease;
+  }
+  .job .progress-bar.indeterminate .fill {
+    width: 35% !important;
+    animation: progress-slide 1.4s ease-in-out infinite;
+    background: linear-gradient(90deg, var(--accent-soft), var(--accent), var(--accent-soft));
+  }
+  @keyframes progress-slide {
+    0%   { left: -35%; }
+    100% { left: 100%; }
+  }
+  .job .progress-text { font-variant-numeric: tabular-nums; min-width: 90px; text-align: right; }
+  .job .progress-eta { font-variant-numeric: tabular-nums; color: var(--text-faint); min-width: 80px; }
+
+  /* ---------------------------------------------------------------- main */
+  main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: calc(100vh - var(--header-h));
+    min-height: 0;
+  }
+  body.jobs-visible main { height: calc(100vh - var(--header-h) - var(--jobs-h)); }
+
+  /* ------------------------------------------------------------- sidebar */
+  aside {
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  aside .filter {
+    padding: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--panel); z-index: 1;
+  }
+  aside .filter select { flex: 1 1 120px; min-width: 0; }
+  aside .filter #filter-company { flex-basis: 100%; }
+  aside ol { list-style: none; margin: 0; padding: 0; }
+  aside li {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: background-color .12s ease, border-color .12s ease;
+    position: relative;
+  }
+  aside li:hover { background: #f8fafc; }
+  aside li.selected {
+    background: var(--accent-soft);
+  }
+  aside li.selected::before {
+    content: "";
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--accent);
+  }
+  aside li .req {
+    font-weight: 600; font-size: 13px; letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  aside li .req .req-id { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
+  aside li .doc { color: var(--text-faint); font-size: 11px; font-family: var(--font-mono); }
+  aside li .co { font-size: 11px; display: flex; }
+  aside li .co .co-tag {
+    padding: 2px 8px; border-radius: var(--radius-pill);
+    font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", var(--font-sans);
+  }
+  aside li .co .co-tag.linked { background: var(--accent-soft); color: var(--accent-strong); }
+  aside li .co .co-tag.unlinked {
+    background: transparent; color: var(--text-faint);
+    border: 1px dashed var(--border-strong); font-family: var(--font-sans);
+    font-size: 10px; padding: 1px 6px;
+  }
+  aside li .state { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  aside li .final-arrow { color: var(--text-faint); font-size: 10px; margin-left: 4px; }
+
+  /* ---------------------------------------------------------------- pill */
+  .pill {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .pill.Met { background: var(--met-bg); color: var(--met-fg); }
+  .pill.NotMet { background: var(--notmet-bg); color: var(--notmet-fg); }
+  .pill.NeedsReview { background: var(--review-bg); color: var(--review-fg); }
+  .pill.accepted { background: var(--met-bg); color: var(--met-fg); }
+  .pill.changed { background: var(--review-bg); color: var(--review-fg); }
+  .pill.deferred { background: #eef0f3; color: var(--text-muted); }
+  .pill.queued { background: #eef0f3; color: var(--text-muted); }
+  .pill.running { background: var(--accent-soft); color: var(--accent-strong); }
+  .pill.done { background: var(--met-bg); color: var(--met-fg); }
+  .pill.error { background: var(--notmet-bg); color: var(--notmet-fg); }
+  .pill.canceled { background: #eef0f3; color: var(--text-muted); }
+
+  /* ------------------------------------------------------------- detail */
+  section.detail {
+    padding: 24px 32px 48px;
+    overflow-y: auto;
+  }
+  .empty {
+    color: var(--text-faint);
+    font-style: normal;
+    padding: 48px 16px;
+    text-align: center;
+    font-size: 13px;
+  }
+  .empty .big { font-size: 15px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+
+  .card {
+    background: var(--panel-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .card h2 {
+    margin: 0 0 14px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap;
+    gap: 10px 24px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .meta-row span { display: inline-flex; align-items: center; gap: 6px; }
+  .meta-row strong { color: var(--text-faint); font-weight: 500; }
+
+  .req-text { font-size: 15px; line-height: 1.65; margin: 4px 0 0; color: var(--text); }
+  .req-text[dir="rtl"] { font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", var(--font-sans); font-size: 16px; }
+
+  .quote {
+    background: #fcfaf3;
+    border-left: 3px solid #d6b84f;
+    padding: 14px 18px;
+    margin-top: 12px;
+    font-size: 14px;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+  }
+  .quote[dir="rtl"] { border-left: none; border-right: 3px solid #d6b84f; font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", var(--font-sans); }
+
+  .reason { font-size: 14px; line-height: 1.6; color: var(--text); margin: 0; }
+  .reason[dir="rtl"], .reason[dir="auto"] { font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", var(--font-sans); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 4px; }
+  .controls label { font-size: 12px; color: var(--text-faint); display: flex; align-items: center; gap: 8px; }
+
+  .buttons { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+  /* ---------------------------------------------------------- decision banner */
+  .decision-banner {
+    display: flex; flex-direction: column;
+    gap: 2px;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid;
+    margin-bottom: 16px;
+    font-size: 13px;
+    box-shadow: var(--shadow-sm);
+  }
+  .decision-banner.accepted { background: var(--met-bg); border-color: #a7f3d0; color: #065f46; }
+  .decision-banner.changed { background: var(--review-bg); border-color: #fde68a; color: #854d0e; }
+  .decision-banner.deferred { background: #f4f5f7; border-color: var(--border-strong); color: var(--text); }
+  .decision-banner .headline { font-weight: 700; font-size: 14px; letter-spacing: -0.01em; }
+  .decision-banner .meta { font-size: 12px; opacity: 0.85; }
+
+  /* --------------------------------------------------------------- toast */
+  .toast {
+    position: fixed;
+    right: 24px; bottom: 24px;
+    background: #0b1324;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .18s ease, transform .18s ease;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: var(--shadow-md);
+    max-width: 420px;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* --------------------------------------------------------------- kbd */
+  kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    background: #f1f3f6;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    line-height: 1.4;
+  }
+  .shortcut-hint { color: var(--text-faint); font-size: 11px; margin-left: 6px; }
+
+  /* --------------------------------------------------------- register drawer */
+  #register-overlay {
+    position: fixed; inset: 0;
+    background: rgba(11, 19, 36, 0.35);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 40;
+  }
+  #register-overlay.show { opacity: 1; pointer-events: auto; }
+
+  #register-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(640px, 100vw);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(16, 24, 40, 0.08);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .22s ease;
+    z-index: 50;
+  }
+  #register-drawer.show { transform: translateX(0); }
+  #register-drawer .drawer-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  #register-drawer .drawer-header h2 {
+    margin: 0 0 4px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  #register-drawer .drawer-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--text-faint); }
+  #register-drawer .drawer-hint { color: var(--text-faint); }
+  #register-drawer .drawer-toolbar {
+    display: flex; gap: 10px; align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  #register-drawer .drawer-toolbar #register-filter { flex: 2; min-width: 200px; }
+  #register-drawer .drawer-toolbar #register-section-filter { flex: 1; min-width: 160px; }
+  #register-drawer .drawer-toolbar-actions { display: flex; gap: 6px; margin-left: auto; }
+  #register-drawer .drawer-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 20px 20px;
+  }
+  #register-drawer .register-row {
+    display: grid;
+    grid-template-columns: 22px minmax(100px, 150px) 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+  }
+  #register-drawer .register-row:first-of-type { border-top: none; }
+  #register-drawer .register-row input[type="checkbox"] { margin-top: 2px; }
+  #register-drawer .register-row .req-id {
+    font-family: var(--font-mono); font-size: 12px; color: var(--text);
+    font-weight: 600;
+  }
+  #register-drawer .register-row .req-meta {
+    color: var(--text-faint); font-size: 11px;
+    display: flex; gap: 10px; margin-top: 2px; flex-wrap: wrap;
+  }
+  #register-drawer .register-row .req-text { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+  #register-drawer .register-row .req-text[dir="rtl"] { font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", var(--font-sans); font-size: 13px; }
+  #register-drawer .register-row.selected { background: var(--accent-soft); border-radius: var(--radius-sm); }
+  #register-drawer .register-row.unknown { opacity: 0.6; }
+
+  #register-drawer .drawer-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+  }
+  #register-drawer .drawer-dirty { font-size: 12px; color: var(--text-muted); }
+  #register-drawer .drawer-footer-actions { display: flex; gap: 8px; }
+
+  /* ------------------------------------------------- compliance drawer -- */
+  #compliance-overlay {
+    position: fixed; inset: 0;
+    background: rgba(16, 24, 40, 0.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 40;
+  }
+  #compliance-overlay.show { opacity: 1; pointer-events: auto; }
+  #compliance-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(720px, 100vw);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(16, 24, 40, 0.08);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .22s ease;
+    z-index: 50;
+  }
+  #compliance-drawer.show { transform: translateX(0); }
+  #compliance-drawer .drawer-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--border);
+  }
+  #compliance-drawer .drawer-header h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  #compliance-drawer .drawer-sub { font-size: 11px; color: var(--text-faint); }
+  #compliance-drawer .drawer-toolbar {
+    display: flex; gap: 10px; align-items: center;
+    padding: 12px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  #compliance-drawer .drawer-toolbar select { min-width: 220px; }
+  #compliance-drawer .totals {
+    display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap;
+    font-size: 11px;
+  }
+  #compliance-drawer .totals .chip {
+    padding: 4px 10px; border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+  }
+  #compliance-drawer .totals .chip.on { background: var(--met-bg); color: var(--met-fg); border-color: transparent; }
+  #compliance-drawer .totals .chip.late { background: var(--notmet-bg); color: var(--notmet-fg); border-color: transparent; }
+  #compliance-drawer .totals .chip.miss { background: var(--review-bg); color: var(--review-fg); border-color: transparent; }
+  #compliance-drawer .drawer-list { flex: 1; overflow-y: auto; padding: 4px 20px 20px; }
+  #compliance-drawer .comp-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 240px) minmax(60px, 90px) 1fr auto;
+    gap: 10px; align-items: center;
+    padding: 10px 0; border-top: 1px solid var(--border);
+  }
+  #compliance-drawer .comp-row:first-of-type { border-top: none; }
+  #compliance-drawer .comp-row .co-name {
+    font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", var(--font-sans);
+    font-size: 13px; color: var(--text); direction: rtl; text-align: right;
+  }
+  #compliance-drawer .comp-row .co-sector { font-size: 10px; color: var(--text-faint); display: block; }
+  #compliance-drawer .comp-row .co-ticker { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+  #compliance-drawer .comp-row .co-meta { font-size: 11px; color: var(--text-muted); }
+  #compliance-drawer .comp-row .co-meta .doc { font-family: var(--font-mono); font-size: 10px; display: block; color: var(--text-faint); }
+  #compliance-drawer .pill.status-submitted_on_time { background: var(--met-bg); color: var(--met-fg); }
+  #compliance-drawer .pill.status-submitted_late { background: var(--notmet-bg); color: var(--notmet-fg); }
+  #compliance-drawer .pill.status-not_submitted { background: var(--review-bg); color: var(--review-fg); }
+
+  /* ------------------------------------------------- company picker ----- */
+  .company-picker {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .company-picker input {
+    font: inherit; font-size: 11px;
+    padding: 3px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--panel); color: var(--text);
+    width: 140px; min-width: 0; max-width: 50vw;
+  }
+  .company-picker input:focus { outline: none; border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .company-picker .co-label {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
+  }
+  .company-picker .co-clear {
+    border: none; background: none; cursor: pointer; color: var(--text-faint);
+    padding: 2px 4px; border-radius: var(--radius-sm);
+  }
+  .company-picker .co-clear:hover { color: var(--notmet-fg); background: var(--notmet-bg); }
+  .company-picker.unlinked .co-label { color: var(--notmet-fg); }
+  .company-picker.linked .co-label { color: var(--met-fg); }
+  .company-picker { flex-wrap: wrap; }
+  .company-picker .co-detect {
+    border: 1px solid var(--border); background: var(--panel);
+    color: var(--text-muted); font-size: 10px; cursor: pointer;
+    padding: 2px 8px; border-radius: var(--radius-sm);
+  }
+  .company-picker .co-detect:hover { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
+  .company-picker .co-suggestions {
+    flex-basis: 100%;
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+    align-items: center;
+  }
+  .company-picker .co-note { font-size: 10px; color: var(--text-faint); }
+  .company-picker .co-detecting { font-size: 10px; color: var(--text-muted); font-style: italic; }
+  .company-picker .co-suggestion {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 8px; border-radius: var(--radius-pill);
+    border: 1px solid var(--border); background: var(--panel);
+    cursor: pointer; font-size: 11px;
+  }
+  .company-picker .co-suggestion:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .company-picker .co-suggestion.preferred { border-color: var(--met-fg); background: var(--met-bg); }
+  .company-picker .co-suggestion .co-tick { font-family: var(--font-mono); font-size: 11px; color: var(--text); }
+  .company-picker .co-suggestion .co-fullname {
+    font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", var(--font-sans);
+    color: var(--text-muted);
+  }
+  .company-picker .co-suggestion .co-score { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+  .detail-company { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .detail-company strong { color: var(--text-faint); font-weight: 500; }
+
+  /* ------------------------------------------------- documents drawer -- */
+  #documents-overlay {
+    position: fixed; inset: 0;
+    background: rgba(16, 24, 40, 0.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 40;
+  }
+  #documents-overlay.show { opacity: 1; pointer-events: auto; }
+  #documents-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(880px, 100vw);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(16, 24, 40, 0.08);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .22s ease;
+    z-index: 50;
+  }
+  #documents-drawer.show { transform: translateX(0); }
+  #documents-drawer .drawer-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--border);
+  }
+  #documents-drawer .drawer-header h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  #documents-drawer .drawer-toolbar {
+    display: flex; gap: 10px; align-items: center;
+    padding: 12px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  #documents-drawer .drawer-toolbar #documents-filter { flex: 2; min-width: 200px; }
+  #documents-drawer .drawer-toolbar #documents-filter-mode { flex: 1; min-width: 180px; }
+  #documents-drawer .drawer-list { flex: 1; overflow-y: auto; padding: 4px 20px 20px; }
+  #documents-drawer .doc-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.4fr) minmax(140px, auto) 1fr;
+    gap: 10px 14px; align-items: start;
+    padding: 12px 0; border-top: 1px solid var(--border);
+  }
+  #documents-drawer .doc-row:first-of-type { border-top: none; }
+  #documents-drawer .doc-row .doc-id {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text); font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  #documents-drawer .doc-row .doc-meta {
+    color: var(--text-faint); font-size: 11px; display: flex; gap: 10px; flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  #documents-drawer .doc-row .doc-meta .chip {
+    padding: 2px 8px; border-radius: var(--radius-pill);
+    background: #eef0f3; color: var(--text-muted); font-size: 10px;
+  }
+  #documents-drawer .doc-row .doc-meta .chip.ok { background: var(--met-bg); color: var(--met-fg); }
+  #documents-drawer .doc-row .doc-meta .chip.warn { background: var(--review-bg); color: var(--review-fg); }
+  #documents-drawer .doc-row .doc-meta .chip.bad { background: var(--notmet-bg); color: var(--notmet-fg); }
+  #documents-drawer .doc-row .doc-counts {
+    display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-muted);
+  }
+  #documents-drawer .doc-row .doc-counts .count-row {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  #documents-drawer .doc-row .doc-counts .count {
+    font-variant-numeric: tabular-nums;
+  }
+  #documents-drawer .doc-row .doc-counts .count.met { color: var(--met-fg); }
+  #documents-drawer .doc-row .doc-counts .count.notmet { color: var(--notmet-fg); }
+  #documents-drawer .doc-row .doc-counts .count.review { color: var(--review-fg); }
+  #documents-drawer .doc-row .doc-actions {
+    display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+  }
+  #documents-drawer .doc-row .doc-actions .company-picker { flex-wrap: wrap; }
+  #documents-drawer .doc-row .doc-actions .doc-action-row {
+    display: flex; gap: 6px;
+  }
+
+  /* ------------------------------------------------- periods manager --- */
+  .periods-manager {
+    padding: 10px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fafbfc;
+  }
+  .periods-manager-list {
+    display: flex; flex-direction: column; gap: 6px;
+    margin-bottom: 10px;
+  }
+  .periods-manager-list .period-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 110px auto;
+    gap: 10px; align-items: center;
+    padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--panel); font-size: 12px;
+  }
+  .periods-manager-list .period-row .pid {
+    font-family: var(--font-mono); font-weight: 600; font-size: 11px;
+  }
+  .periods-manager-list .period-row .pdesc { color: var(--text-muted); }
+  .periods-manager-list .period-row .pdue {
+    font-variant-numeric: tabular-nums; color: var(--text-muted);
+  }
+  .periods-manager-list .empty-row {
+    padding: 8px; color: var(--text-muted); font-style: italic; font-size: 12px;
+  }
+  .periods-manager-form {
+    display: grid;
+    grid-template-columns: 160px 1fr 160px auto;
+    gap: 8px 10px; align-items: end;
+  }
+  .periods-manager-form .field { display: flex; flex-direction: column; gap: 4px; }
+  .periods-manager-form .field label { font-size: 11px; color: var(--text-muted); }
+  .periods-manager-form .field.actions { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+
+  /* ------------------------------------------------- bulk detect report */
+  .bulk-detect-report {
+    padding: 0 20px; max-height: 220px; overflow-y: auto;
+    border-bottom: 1px solid var(--border);
+  }
+  .bulk-detect-report:empty { padding: 0; border-bottom: none; }
+  .bulk-detect-report .bulk-summary {
+    padding: 10px 0; font-size: 11px; color: var(--text-muted);
+  }
+  .bulk-detect-report .bulk-attention-title {
+    font-size: 11px; font-weight: 600; color: var(--notmet-fg);
+    padding: 4px 0 8px;
+  }
+  .bulk-detect-report .bulk-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 6px 0; border-top: 1px dashed var(--border);
+  }
+  .bulk-detect-report .bulk-doc {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text);
+  }
+  .bulk-detect-report .bulk-reason {
+    font-size: 10px; padding: 1px 8px; border-radius: var(--radius-pill);
+    background: var(--review-bg); color: var(--review-fg);
+  }
+  .bulk-detect-report .bulk-chips {
+    display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap;
+  }
+
+  /* ----------------------------------------------------------- responsive */
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    aside { max-height: 240px; }
+    header { gap: 10px; padding: 0 12px; }
+    .brand h1 { font-size: 14px; }
+    .toolbar { gap: 8px; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>JSC Reviewer</h1>
-  <span class="meta" id="progress">loading…</span>
-  <div class="upload-bar">
-    <input id="upload-file" type="file" accept="application/pdf,.pdf" />
-    <button id="upload-button" type="button">Upload PDF</button>
-    <span id="upload-status" class="meta"></span>
+  <div class="brand">
+    <div class="mark" aria-hidden="true">JSC</div>
+    <div>
+      <h1>JSC Reviewer</h1>
+      <div class="subtitle">Local recommendations · reviewer confirms</div>
+    </div>
   </div>
-  <div class="reviewer-info">
-    <label>Reviewer name:
-      <input id="reviewer-name" type="text" placeholder="e.g. A. Hamed" />
+  <span class="progress-chip" id="progress">loading…</span>
+  <div class="toolbar">
+    <input id="upload-file" type="file" accept="application/pdf,.pdf" class="input" multiple />
+    <button id="upload-button" type="button" class="btn primary">Upload PDFs</button>
+    <span id="upload-status" style="font-size:12px;color:var(--text-muted);"></span>
+    <div class="divider"></div>
+    <button id="open-register" type="button" class="btn ghost" title="Choose which requirements the pipeline runs">Requirements</button>
+    <button id="open-documents" type="button" class="btn ghost" title="Browse every uploaded document, link to companies, delete">Documents</button>
+    <button id="open-compliance" type="button" class="btn ghost" title="Show which companies are late on their disclosure">Compliance</button>
+    <div class="divider"></div>
+    <label style="font-size:12px;color:var(--text-faint);display:flex;align-items:center;gap:8px;">
+      Reviewer
+      <input id="reviewer-name" type="text" class="input" placeholder="e.g. A. Hamed" style="width:160px;" />
     </label>
   </div>
 </header>
+<div id="register-overlay" aria-hidden="true"></div>
+<aside id="register-drawer" aria-hidden="true" aria-labelledby="register-title">
+  <header class="drawer-header">
+    <div>
+      <h2 id="register-title">Selected requirements</h2>
+      <div class="drawer-sub">
+        <span id="register-summary">loading...</span>
+        <span class="drawer-hint">Takes effect on the next upload. The checklist text and classifications stay locked to the source.</span>
+      </div>
+    </div>
+    <button id="close-register" type="button" class="btn ghost compact">Close</button>
+  </header>
+  <div class="drawer-toolbar">
+    <input id="register-filter" type="text" class="input" placeholder="Filter by id, section, or text..." />
+    <select id="register-section-filter" class="input">
+      <option value="">All sections</option>
+    </select>
+    <div class="drawer-toolbar-actions">
+      <button id="register-select-filtered" type="button" class="btn ghost compact">Select filtered</button>
+      <button id="register-deselect-filtered" type="button" class="btn ghost compact">Clear filtered</button>
+    </div>
+  </div>
+  <div id="register-list" class="drawer-list"></div>
+  <footer class="drawer-footer">
+    <span id="register-dirty" class="drawer-dirty"></span>
+    <div class="drawer-footer-actions">
+      <button id="register-revert" type="button" class="btn ghost">Revert</button>
+      <button id="register-save" type="button" class="btn primary">Save selection</button>
+    </div>
+  </footer>
+</aside>
+<div id="compliance-overlay" aria-hidden="true"></div>
+<aside id="compliance-drawer" aria-hidden="true" aria-labelledby="compliance-title">
+  <header class="drawer-header">
+    <div>
+      <h2 id="compliance-title">Disclosure compliance</h2>
+      <div class="drawer-sub">
+        Based on the local company registry and the dates parsed from each uploaded document id.
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="manage-periods-toggle" type="button" class="btn ghost compact" title="Add, edit, or remove disclosure periods">Manage periods</button>
+      <button id="bulk-detect" type="button" class="btn ghost compact" title="Scan every extracted document for a matching company">Detect companies</button>
+      <button id="close-compliance" type="button" class="btn ghost compact">Close</button>
+    </div>
+  </header>
+  <div class="drawer-toolbar">
+    <select id="compliance-period" class="input"></select>
+    <div class="totals" id="compliance-totals"></div>
+  </div>
+  <div id="periods-manager" class="periods-manager" hidden>
+    <div class="periods-manager-list" id="periods-manager-list"></div>
+    <form id="period-create-form" class="periods-manager-form" autocomplete="off">
+      <div class="field">
+        <label for="period-id">Period id</label>
+        <input id="period-id" class="input" type="text" required pattern="[A-Za-z0-9._\-]{1,64}" placeholder="e.g. Q2-2026" />
+      </div>
+      <div class="field">
+        <label for="period-description">Description</label>
+        <input id="period-description" class="input" type="text" maxlength="240" placeholder="e.g. Q2 2026 interim disclosure" />
+      </div>
+      <div class="field">
+        <label for="period-due">Due date</label>
+        <input id="period-due" class="input" type="date" required />
+      </div>
+      <div class="field actions">
+        <button type="submit" class="btn primary compact">Add period</button>
+        <span id="period-create-status" class="drawer-hint"></span>
+      </div>
+    </form>
+  </div>
+  <div id="bulk-detect-report" class="bulk-detect-report"></div>
+  <div id="compliance-list" class="drawer-list"></div>
+  <datalist id="company-datalist"></datalist>
+</aside>
+<div id="documents-overlay" aria-hidden="true"></div>
+<aside id="documents-drawer" aria-hidden="true" aria-labelledby="documents-title">
+  <header class="drawer-header">
+    <div>
+      <h2 id="documents-title">Documents</h2>
+      <div class="drawer-sub">
+        Every uploaded or extracted document, with its company link and finding counts.
+      </div>
+    </div>
+    <button id="close-documents" type="button" class="btn ghost compact">Close</button>
+  </header>
+  <div class="drawer-toolbar">
+    <input id="documents-filter" type="text" class="input" placeholder="Filter by id, company, or ticker..." />
+    <select id="documents-filter-mode" class="input">
+      <option value="">All documents</option>
+      <option value="unlinked">Unlinked only</option>
+      <option value="linked">Linked only</option>
+      <option value="unreviewed">Has unreviewed findings</option>
+      <option value="no_findings">No findings yet</option>
+    </select>
+    <span id="documents-summary" class="drawer-hint" style="margin-left:auto;"></span>
+  </div>
+  <div id="documents-list" class="drawer-list"></div>
+</aside>
 <div id="jobs-panel">
-  <h3>Processing jobs</h3>
+  <div class="jobs-header">
+    <h3>Processing jobs</h3>
+    <span class="jobs-summary" id="jobs-summary"></span>
+  </div>
   <div id="jobs-list"></div>
 </div>
 <main>
   <aside>
     <div class="filter">
-      <select id="filter-status">
+      <select id="filter-status" class="input">
         <option value="">All statuses</option>
         <option>Met</option>
         <option>Not Met</option>
         <option>Needs Review</option>
       </select>
-      <select id="filter-decision">
+      <select id="filter-decision" class="input">
         <option value="">All decisions</option>
         <option value="undecided">Not reviewed</option>
         <option value="accepted">Accepted</option>
         <option value="changed">Changed</option>
         <option value="deferred">Deferred</option>
       </select>
+      <select id="filter-company" class="input" title="Filter by the company linked to each document">
+        <option value="">All companies</option>
+      </select>
     </div>
     <ol id="finding-list"></ol>
   </aside>
   <section class="detail" id="detail">
-    <p class="empty">Select a finding on the left to review it.</p>
+    <div class="empty">
+      <div class="big">Pick a finding on the left to start.</div>
+      <div>Keyboard shortcuts: <kbd>J</kbd> / <kbd>K</kbd> navigate, <kbd>A</kbd> accept, <kbd>C</kbd> change, <kbd>D</kbd> defer, <kbd>/</kbd> focus filter.</div>
+    </div>
   </section>
 </main>
 <div class="toast" id="toast"></div>
@@ -140,6 +985,7 @@ const state = {
   currentIndex: -1,
   filterStatus: "",
   filterDecision: "",
+  filterCompany: "",   // "" = all, "__unlinked__" = no company, else = company key
 };
 
 const el = (sel) => document.querySelector(sel);
@@ -150,6 +996,7 @@ const create = (tag, props = {}, children = []) => {
     else if (key === "dataset") Object.assign(node.dataset, value);
     else if (key === "html") node.innerHTML = value;
     else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else if (key === "style") node.setAttribute("style", value);
     else node.setAttribute(key, value);
   }
   for (const child of children) {
@@ -162,10 +1009,14 @@ const create = (tag, props = {}, children = []) => {
 async function loadBundle() {
   const response = await fetch("/reviewer/findings");
   if (!response.ok) {
-    el("#detail").innerHTML = "<p class='empty'>Could not load findings. Is the pipeline run complete?</p>";
+    el("#detail").innerHTML = "<div class='empty'><div class='big'>Could not load findings.</div><div>Is the pipeline run complete?</div></div>";
     return;
   }
   state.bundle = await response.json();
+  // Make sure company data is available before rendering the list,
+  // otherwise the inline company tags render as "no company" momentarily.
+  await Promise.all([ensureCompaniesLoaded(), loadDocumentCompanies()]);
+  populateCompanyFilter();
   renderList();
   updateProgress();
   if (state.bundle.findings.length) selectIndex(0);
@@ -180,9 +1031,84 @@ function filteredIndexes() {
       if (state.filterDecision === "undecided" && finding.decision) return;
       if (state.filterDecision !== "undecided" && finding.decision?.action !== state.filterDecision) return;
     }
+    if (state.filterCompany) {
+      const link = companyState.docLinks[finding.document_id];
+      if (state.filterCompany === "__unlinked__") {
+        if (link) return;
+      } else if (!link || link.company_key !== state.filterCompany) {
+        return;
+      }
+    }
     result.push(index);
   });
   return result;
+}
+
+function companyForDocument(documentId) {
+  const link = companyState.docLinks[documentId];
+  if (!link) return null;
+  return companyState.byKey.get(link.company_key)
+    || companyState.byTicker.get(link.company_key.toUpperCase())
+    || companyState.byNumeric.get(link.company_key)
+    || null;
+}
+
+function populateCompanyFilter() {
+  const select = document.getElementById("filter-company");
+  if (!select) return;
+  const previous = select.value;
+
+  // Build the set of company keys that actually have at least one finding
+  const linkedKeys = new Set();
+  let hasUnlinked = false;
+  const docIds = state.bundle
+    ? new Set(state.bundle.findings.map((f) => f.document_id))
+    : new Set();
+  for (const docId of docIds) {
+    const link = companyState.docLinks[docId];
+    if (link) linkedKeys.add(link.company_key);
+    else hasUnlinked = true;
+  }
+
+  // Prefer the companies that actually show up, sorted by Arabic name
+  const companies = [];
+  for (const key of linkedKeys) {
+    const company = companyState.byKey.get(key)
+      || companyState.byTicker.get(key.toUpperCase())
+      || companyState.byNumeric.get(key);
+    companies.push({
+      key,
+      name: company ? company.name_ar : key,
+      ticker: company ? (company.ticker || company.numeric_code) : "",
+    });
+  }
+  companies.sort((a, b) => a.name.localeCompare(b.name, "ar"));
+
+  select.innerHTML = "";
+  select.appendChild(create("option", { value: "" }, [
+    `All companies (${docIds.size} docs)`,
+  ]));
+  if (hasUnlinked) {
+    select.appendChild(create("option", { value: "__unlinked__" }, [
+      "— No company linked —",
+    ]));
+  }
+  for (const entry of companies) {
+    const label = entry.ticker ? `${entry.ticker} — ${entry.name}` : entry.name;
+    select.appendChild(create("option", { value: entry.key }, [label]));
+  }
+  // Restore previous selection when still valid
+  const stillValid = Array.from(select.options).some((o) => o.value === previous);
+  select.value = stillValid ? previous : "";
+  state.filterCompany = select.value;
+}
+
+function effectiveStatus(finding) {
+  return finding.decision ? finding.decision.final_status : finding.result.status;
+}
+
+function statusChanged(finding) {
+  return finding.decision && finding.decision.final_status !== finding.result.status;
 }
 
 function renderList() {
@@ -192,20 +1118,43 @@ function renderList() {
   for (const index of indexes) {
     const finding = state.bundle.findings[index];
     const result = finding.result;
-    const statusClass = result.status.replace(/\s/g, "");
+    const effective = effectiveStatus(finding);
+    const effectiveClass = effective.replace(/\s/g, "");
     const decision = finding.decision;
+    const stateChildren = [
+      create("span", { class: `pill ${effectiveClass}` }, [effective]),
+    ];
+    if (statusChanged(finding)) {
+      stateChildren.push(
+        create("span", { class: "final-arrow" }, [`\u2190 was ${result.status}`]),
+      );
+    }
+    stateChildren.push(
+      decision
+        ? create("span", { class: `pill ${decision.action}` }, [decisionLabel(decision.action)])
+        : create("span", { class: "pill deferred" }, ["Not reviewed"]),
+    );
+    const company = companyForDocument(finding.document_id);
+    const companyChildren = [];
+    if (company) {
+      const label = company.ticker || company.numeric_code || "";
+      companyChildren.push(create("span", { class: "co-tag linked" }, [
+        label ? `${label} · ${company.name_ar}` : company.name_ar,
+      ]));
+    } else {
+      companyChildren.push(create("span", { class: "co-tag unlinked" }, ["no company"]));
+    }
+
     const li = create("li", {
       dataset: { index: String(index) },
       onclick: () => selectIndex(index),
     }, [
-      create("div", { class: "req" }, [`${result.requirement_id}`]),
-      create("div", { class: "doc" }, [finding.document_id]),
-      create("div", { class: "state" }, [
-        create("span", { class: `pill ${statusClass}` }, [result.status]),
-        decision
-          ? create("span", { class: `pill ${decision.action}` }, [decisionLabel(decision.action)])
-          : create("span", { class: "pill deferred" }, ["Not reviewed"]),
+      create("div", { class: "req" }, [
+        create("span", { class: "req-id" }, [result.requirement_id]),
       ]),
+      create("div", { class: "doc" }, [finding.document_id]),
+      create("div", { class: "co" }, companyChildren),
+      create("div", { class: "state" }, stateChildren),
     ]);
     if (index === state.currentIndex) li.classList.add("selected");
     list.appendChild(li);
@@ -232,6 +1181,8 @@ function selectIndex(index) {
   state.currentIndex = index;
   renderList();
   renderDetail();
+  const li = document.querySelector(`#finding-list li[data-index="${index}"]`);
+  if (li) li.scrollIntoView({ block: "nearest" });
 }
 
 function renderDetail() {
@@ -239,7 +1190,7 @@ function renderDetail() {
   const detail = el("#detail");
   detail.innerHTML = "";
   if (!finding) {
-    detail.innerHTML = "<p class='empty'>Select a finding on the left.</p>";
+    detail.innerHTML = "<div class='empty'><div class='big'>Pick a finding on the left.</div></div>";
     return;
   }
   const result = finding.result;
@@ -248,16 +1199,49 @@ function renderDetail() {
   const textAr = state.bundle.requirement_text_ar[result.requirement_id] || "";
   const textEn = state.bundle.requirement_text_en[result.requirement_id] || "";
   const statusClass = result.status.replace(/\s/g, "");
+  const effective = effectiveStatus(finding);
+  const effectiveClass = effective.replace(/\s/g, "");
 
-  const header = create("div", { class: "card" }, [
-    create("div", { class: "meta-row" }, [
-      create("span", {}, [create("strong", {}, ["Requirement: "]), result.requirement_id]),
-      create("span", {}, [create("strong", {}, ["Document: "]), finding.document_id]),
-      create("span", {}, [create("strong", {}, ["System says: "]), create("span", { class: `pill ${statusClass}` }, [result.status])]),
-      create("span", {}, [create("strong", {}, ["Confidence: "]), String(result.confidence)]),
-      create("span", {}, [create("strong", {}, ["Human review: "]), result.human_review]),
-      create("span", {}, [create("strong", {}, ["Method: "]), result.evaluation_method]),
+  let banner = null;
+  if (decision) {
+    const when = new Date(decision.decided_at).toLocaleString();
+    const label = decisionLabel(decision.action);
+    const changedNote = statusChanged(finding)
+      ? ` · Status changed from "${result.status}" to "${decision.final_status}"`
+      : "";
+    banner = create("div", { class: `decision-banner ${decision.action}` }, [
+      create("span", { class: "headline" }, [`${label} as "${decision.final_status}"`]),
+      create("span", { class: "meta" }, [`by ${decision.reviewer_name} on ${when}${changedNote}`]),
+    ]);
+  }
+
+  const headerChildren = [
+    create("span", {}, [create("strong", {}, ["Requirement"]), create("span", { class: "mono" }, [result.requirement_id])]),
+    create("span", {}, [create("strong", {}, ["Document"]), create("span", { class: "mono" }, [finding.document_id])]),
+    create("span", { class: "detail-company" }, [
+      create("strong", {}, ["Company"]),
+      renderCompanyPicker(finding.document_id),
     ]),
+    create("span", {}, [
+      create("strong", {}, ["System says"]),
+      create("span", { class: `pill ${statusClass}` }, [result.status]),
+    ]),
+  ];
+  if (decision) {
+    headerChildren.push(
+      create("span", {}, [
+        create("strong", {}, ["Final"]),
+        create("span", { class: `pill ${effectiveClass}` }, [effective]),
+      ]),
+    );
+  }
+  headerChildren.push(
+    create("span", {}, [create("strong", {}, ["Confidence"]), String(result.confidence)]),
+    create("span", {}, [create("strong", {}, ["Human review"]), result.human_review]),
+    create("span", {}, [create("strong", {}, ["Method"]), result.evaluation_method]),
+  );
+  const header = create("div", { class: "card" }, [
+    create("div", { class: "meta-row" }, headerChildren),
   ]);
 
   const requirement = create("div", { class: "card" }, [
@@ -269,14 +1253,14 @@ function renderDetail() {
   const evidenceCard = create("div", { class: "card" }, [
     create("h2", {}, ["Evidence"]),
     evidence ? create("div", { class: "meta-row" }, [
-      create("span", {}, [create("strong", {}, ["Page: "]), String(evidence.page)]),
-      create("span", {}, [create("strong", {}, ["Section: "]), evidence.section || "(none)"]),
-      create("span", {}, [create("strong", {}, ["Chunk: "]), evidence.chunk_id]),
-      create("span", {}, [create("strong", {}, ["Verified on embedded page: "]), evidence.verified ? "yes" : "no"]),
+      create("span", {}, [create("strong", {}, ["Page"]), String(evidence.page)]),
+      create("span", {}, [create("strong", {}, ["Section"]), evidence.section || "(none)"]),
+      create("span", {}, [create("strong", {}, ["Chunk"]), create("span", { class: "mono" }, [evidence.chunk_id])]),
+      create("span", {}, [create("strong", {}, ["Verified"]), evidence.verified ? "yes" : "no"]),
     ]) : null,
     evidence
       ? create("div", { class: "quote", dir: "auto" }, [evidence.text])
-      : create("p", { class: "empty" }, ["No evidence attached to this finding."]),
+      : create("p", { class: "empty", style: "padding:16px 0;text-align:left;" }, ["No evidence attached to this finding."]),
   ]);
 
   const reason = create("div", { class: "card" }, [
@@ -284,16 +1268,20 @@ function renderDetail() {
     create("p", { class: "reason", dir: "auto" }, [result.reason]),
   ]);
 
+  const acceptCurrent = decision?.action === "accepted";
+  const changeCurrent = decision?.action === "changed";
+  const deferCurrent = decision?.action === "deferred";
+  const acceptLabel = acceptCurrent ? "\u2713 Accepted" : "Accept";
+  const changeLabel = changeCurrent ? "\u2713 Changed" : "Change";
+  const deferLabel = deferCurrent ? "\u2713 Deferred" : "Defer to Needs Review";
+
   const controls = create("div", { class: "card" }, [
     create("h2", {}, ["Your decision"]),
-    decision ? create("p", { class: "decision-note" }, [
-      `Last decision: ${decisionLabel(decision.action)} as "${decision.final_status}" by ${decision.reviewer_name} on ${new Date(decision.decided_at).toLocaleString()}.`,
-    ]) : null,
     create("div", { class: "controls" }, [
       create("label", {}, [
-        "Final status: ",
+        "Final status",
         (() => {
-          const select = create("select", { id: "final-status" }, [
+          const select = create("select", { id: "final-status", class: "input" }, [
             create("option", {}, ["Met"]),
             create("option", {}, ["Not Met"]),
             create("option", {}, ["Needs Review"]),
@@ -302,22 +1290,26 @@ function renderDetail() {
           return select;
         })(),
       ]),
+      create("span", { class: "shortcut-hint" }, [
+        "Shortcuts: ", create("kbd", {}, ["A"]), " accept · ", create("kbd", {}, ["C"]), " change · ", create("kbd", {}, ["D"]), " defer",
+      ]),
     ]),
-    create("div", {}, [
+    create("div", { style: "margin-top:12px;" }, [
       create("textarea", {
         id: "reviewer-notes",
-        placeholder: "Notes (required when you change the status).",
+        placeholder: "Notes (required when you set a different status).",
       }, [decision?.reviewer_notes || ""]),
     ]),
     create("div", { class: "buttons" }, [
-      create("button", { class: "accept", onclick: () => submitDecision("accepted") }, ["Accept"]),
-      create("button", { class: "change", onclick: () => submitDecision("changed") }, ["Change"]),
-      create("button", { class: "defer", onclick: () => submitDecision("deferred") }, ["Defer to Needs Review"]),
+      create("button", { class: `btn accept ${acceptCurrent ? "current" : ""}`, onclick: () => submitDecision("accepted") }, [acceptLabel]),
+      create("button", { class: `btn change ${changeCurrent ? "current" : ""}`, onclick: () => submitDecision("changed") }, [changeLabel]),
+      create("button", { class: `btn defer ${deferCurrent ? "current" : ""}`, onclick: () => submitDecision("deferred") }, [deferLabel]),
     ]),
   ]);
 
-  detail.append(header, requirement, evidenceCard, reason, controls);
-  // Prefill notes
+  detail.append(header);
+  if (banner) detail.append(banner);
+  detail.append(requirement, evidenceCard, reason, controls);
   const notesInput = el("#reviewer-notes");
   if (notesInput && decision?.reviewer_notes) notesInput.value = decision.reviewer_notes;
 }
@@ -333,12 +1325,21 @@ async function submitDecision(action) {
   }
   const finalStatusSelect = el("#final-status");
   const notesInput = el("#reviewer-notes");
-  let finalStatus = finalStatusSelect.value;
-  if (action === "accepted") finalStatus = finding.result.status;
-  if (action === "deferred") finalStatus = "Needs Review";
+  const dropdownStatus = finalStatusSelect.value;
+  const systemStatus = finding.result.status;
   const notes = notesInput.value.trim();
-  if (action === "changed" && !notes) {
-    toast("Notes are required when you change the status.");
+  let finalStatus;
+  let effectiveAction = action;
+  if (action === "deferred") {
+    finalStatus = "Needs Review";
+  } else if (action === "accepted") {
+    finalStatus = dropdownStatus;
+    if (dropdownStatus !== systemStatus) effectiveAction = "changed";
+  } else {
+    finalStatus = dropdownStatus;
+  }
+  if (effectiveAction === "changed" && !notes) {
+    toast(`Notes are required when you set a different status (${systemStatus} \u2192 ${finalStatus}).`);
     notesInput.focus();
     return;
   }
@@ -348,7 +1349,7 @@ async function submitDecision(action) {
     body: JSON.stringify({
       document_id: finding.document_id,
       requirement_id: finding.result.requirement_id,
-      action,
+      action: effectiveAction,
       final_status: finalStatus,
       reviewer_name: reviewerName,
       reviewer_notes: notes,
@@ -364,7 +1365,7 @@ async function submitDecision(action) {
   updateProgress();
   renderList();
   renderDetail();
-  toast("Saved.");
+  toast(`Saved · ${decisionLabel(effectiveAction)} as "${finalStatus}".`);
 }
 
 function toast(message) {
@@ -372,7 +1373,7 @@ function toast(message) {
   node.textContent = message;
   node.classList.add("show");
   clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => node.classList.remove("show"), 2200);
+  toast._timer = setTimeout(() => node.classList.remove("show"), 2400);
 }
 
 el("#filter-status").addEventListener("change", (e) => {
@@ -383,6 +1384,40 @@ el("#filter-decision").addEventListener("change", (e) => {
   state.filterDecision = e.target.value;
   renderList();
 });
+el("#filter-company").addEventListener("change", (e) => {
+  state.filterCompany = e.target.value;
+  renderList();
+});
+
+// --- Keyboard shortcuts -----------------------------------------------------
+document.addEventListener("keydown", (event) => {
+  const tag = (event.target.tagName || "").toLowerCase();
+  const editable = tag === "input" || tag === "textarea" || tag === "select";
+  if (event.key === "/" && !editable) {
+    event.preventDefault();
+    el("#filter-status").focus();
+    return;
+  }
+  if (editable) return;
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const indexes = filteredIndexes();
+  const here = indexes.indexOf(state.currentIndex);
+  switch (event.key.toLowerCase()) {
+    case "j":
+    case "arrowdown":
+      event.preventDefault();
+      if (indexes.length && here < indexes.length - 1) selectIndex(indexes[here + 1]);
+      break;
+    case "k":
+    case "arrowup":
+      event.preventDefault();
+      if (indexes.length && here > 0) selectIndex(indexes[here - 1]);
+      break;
+    case "a": event.preventDefault(); submitDecision("accepted"); break;
+    case "c": event.preventDefault(); submitDecision("changed"); break;
+    case "d": event.preventDefault(); submitDecision("deferred"); break;
+  }
+});
 
 // --- Upload + jobs ----------------------------------------------------------
 
@@ -390,43 +1425,73 @@ const uploadState = {
   seenDone: new Set(),
   pollTimer: null,
   pollingErrors: 0,
+  pending: [],   // files waiting to be POSTed from this browser
+  uploading: false,
 };
+
+const JOB_ACTIVE = new Set(["queued", "running"]);
+const JOB_TERMINAL = new Set(["done", "error", "canceled"]);
 
 el("#upload-button").addEventListener("click", async () => {
   const input = el("#upload-file");
   const status = el("#upload-status");
-  const button = el("#upload-button");
-  const file = input.files && input.files[0];
-  if (!file) {
-    status.textContent = "Pick a PDF file first.";
+  const files = Array.from(input.files || []);
+  if (!files.length) {
+    status.textContent = "Pick one or more PDF files first.";
     return;
   }
-  if (!file.name.toLowerCase().endsWith(".pdf")) {
+  const pdfs = files.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+  if (!pdfs.length) {
     status.textContent = "Only .pdf files are supported.";
     return;
   }
-  button.disabled = true;
-  status.textContent = `Uploading ${file.name}...`;
-  try {
-    const body = new FormData();
-    body.append("file", file);
-    const response = await fetch("/reviewer/documents", { method: "POST", body });
-    if (!response.ok) {
-      let detail = "";
-      try { detail = (await response.json()).detail || ""; } catch { /* ignore */ }
-      status.textContent = `Upload failed (${response.status}): ${detail || response.statusText}`;
-      return;
-    }
-    const job = await response.json();
-    status.textContent = `Queued ${job.document_id} (job ${job.job_id.slice(0, 8)}).`;
-    input.value = "";
-    pollJobs();
-  } catch (err) {
-    status.textContent = `Upload error: ${err}`;
-  } finally {
-    button.disabled = false;
+  if (pdfs.length < files.length) {
+    toast(`Skipping ${files.length - pdfs.length} non-PDF file(s).`);
+  }
+  uploadState.pending.push(...pdfs);
+  input.value = "";
+  if (!uploadState.uploading) {
+    processUploadQueue();
   }
 });
+
+async function processUploadQueue() {
+  const status = el("#upload-status");
+  const button = el("#upload-button");
+  uploadState.uploading = true;
+  button.disabled = true;
+  try {
+    while (uploadState.pending.length) {
+      const file = uploadState.pending.shift();
+      const left = uploadState.pending.length;
+      status.textContent = left
+        ? `Uploading ${file.name} (${left} more queued)...`
+        : `Uploading ${file.name}...`;
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const response = await fetch("/reviewer/documents", { method: "POST", body });
+        if (!response.ok) {
+          let detail = "";
+          try { detail = (await response.json()).detail || ""; } catch { /* ignore */ }
+          status.textContent = `Upload failed for ${file.name} (${response.status}): ${detail || response.statusText}`;
+          toast(`Upload failed: ${file.name} - ${detail || response.statusText}`);
+          continue;
+        }
+        const job = await response.json();
+        status.textContent = `Queued ${job.document_id} (job ${job.job_id.slice(0, 8)}). ${left} more waiting.`;
+      } catch (err) {
+        status.textContent = `Upload error: ${err}`;
+        toast(`Upload error: ${file.name}`);
+      }
+    }
+    status.textContent = "All uploads queued. Processing runs one at a time.";
+    pollJobs();
+  } finally {
+    uploadState.uploading = false;
+    button.disabled = false;
+  }
+}
 
 async function pollJobs() {
   try {
@@ -438,7 +1503,7 @@ async function pollJobs() {
     uploadState.pollingErrors = 0;
     const jobs = await response.json();
     renderJobs(jobs);
-    const active = jobs.filter((job) => job.status === "queued" || job.status === "running");
+    const active = jobs.filter((job) => JOB_ACTIVE.has(job.status));
     for (const job of jobs) {
       if (job.status === "done" && !uploadState.seenDone.has(job.job_id)) {
         uploadState.seenDone.add(job.job_id);
@@ -447,7 +1512,7 @@ async function pollJobs() {
       }
     }
     if (active.length > 0) {
-      uploadState.pollTimer = setTimeout(pollJobs, 2500);
+      uploadState.pollTimer = setTimeout(pollJobs, 1500);
     } else {
       uploadState.pollTimer = null;
     }
@@ -457,27 +1522,1226 @@ async function pollJobs() {
   }
 }
 
+async function cancelJob(jobId) {
+  const response = await fetch(`/reviewer/documents/${jobId}/cancel`, { method: "POST" });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try { detail = (await response.json()).detail || detail; } catch { /* ignore */ }
+    toast(`Cancel failed: ${detail}`);
+    return;
+  }
+  toast("Cancel requested. The current step will finish, then the job will stop.");
+  pollJobs();
+}
+
+async function dismissJob(jobId) {
+  const response = await fetch(`/reviewer/documents/${jobId}`, { method: "DELETE" });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try { detail = (await response.json()).detail || detail; } catch { /* ignore */ }
+    toast(`Dismiss failed: ${detail}`);
+    return;
+  }
+  pollJobs();
+}
+
+async function deleteDocument(documentId) {
+  const prompt =
+    `Delete document "${documentId}" and every trace of it?\n\n` +
+    "This removes the PDF, extracted and OCR text, chunk mirror, findings, " +
+    "reviewer decisions, CER measurements, the company link, and all global " +
+    "index entries for this document.\n\n" +
+    "This cannot be undone.";
+  if (!confirm(prompt)) return;
+  const response = await fetch(
+    `/reviewer/documents/by-id/${encodeURIComponent(documentId)}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    let detail = response.statusText;
+    try { detail = (await response.json()).detail || detail; } catch { /* ignore */ }
+    toast(`Delete failed: ${detail}`);
+    return;
+  }
+  const summary = await response.json();
+  const outcomes = summary.outcomes || [];
+  const totalRemoved = outcomes.reduce((sum, step) => sum + (step.removed || 0), 0);
+  const failed = outcomes.filter((step) => !step.ok).map((step) => step.name);
+  const base = `Deleted ${documentId} (${totalRemoved} entries across ${outcomes.length} stores).`;
+  toast(failed.length ? `${base} Partial failure: ${failed.join(", ")}.` : base);
+  pollJobs();
+  loadBundle();
+}
+
+function formatEta(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "";
+  if (seconds < 1) return "<1s";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return s ? `${m}m ${s}s` : `${m}m`;
+}
+
+function renderJobProgress(job) {
+  const total = job.stage_total;
+  const done = job.stage_done;
+  const isActive = JOB_ACTIVE.has(job.status);
+
+  // Finished jobs show no bar - stage pill alone tells the story.
+  if (!isActive) return null;
+
+  const wrap = create("div", { class: "progress-wrap" }, []);
+  const bar = create("div", { class: "progress-bar" }, [
+    create("div", { class: "fill", style: "width: 0%;" }, []),
+  ]);
+  wrap.appendChild(bar);
+
+  const text = create("span", { class: "progress-text" }, []);
+  const eta = create("span", { class: "progress-eta" }, []);
+
+  const haveBounded = typeof total === "number" && total > 0 && typeof done === "number";
+  if (haveBounded) {
+    const ratio = Math.max(0, Math.min(1, done / total));
+    bar.querySelector(".fill").style.width = `${(ratio * 100).toFixed(1)}%`;
+    text.textContent = `${done} / ${total}`;
+    if (job.stage_started_at && done > 0 && done < total) {
+      const started = new Date(job.stage_started_at).getTime();
+      const elapsed = (Date.now() - started) / 1000;
+      const rate = done / Math.max(elapsed, 0.001);
+      const remaining = (total - done) / Math.max(rate, 1e-9);
+      eta.textContent = `ETA ${formatEta(remaining)}`;
+    } else if (done === 0) {
+      eta.textContent = "starting...";
+    } else if (done >= total) {
+      eta.textContent = "wrapping up...";
+    }
+  } else {
+    bar.classList.add("indeterminate");
+    bar.querySelector(".fill").style.width = "35%";
+    text.textContent = job.stage || "";
+    eta.textContent = "";
+  }
+  wrap.appendChild(text);
+  wrap.appendChild(eta);
+  return wrap;
+}
+
+function renderJobActions(job) {
+  const actions = create("div", { class: "actions" }, []);
+  if (JOB_ACTIVE.has(job.status)) {
+    const label = job.cancel_requested ? "Canceling..." : "Cancel";
+    const button = create("button", {
+      class: "btn ghost compact",
+      onclick: () => cancelJob(job.job_id),
+    }, [label]);
+    if (job.cancel_requested) button.disabled = true;
+    actions.appendChild(button);
+  } else if (JOB_TERMINAL.has(job.status)) {
+    actions.appendChild(create("button", {
+      class: "btn ghost compact",
+      onclick: () => dismissJob(job.job_id),
+    }, ["Dismiss"]));
+    if (job.status === "done" || job.status === "error") {
+      actions.appendChild(create("button", {
+        class: "btn ghost compact danger",
+        onclick: () => deleteDocument(job.document_id),
+        title: "Remove the PDF and every stored trace of this document",
+      }, ["Delete document"]));
+    }
+  }
+  return actions;
+}
+
 function renderJobs(jobs) {
   const panel = el("#jobs-panel");
   const list = el("#jobs-list");
+  const summary = el("#jobs-summary");
   if (!jobs.length) {
     panel.classList.remove("show");
     document.body.classList.remove("jobs-visible");
+    summary.textContent = "";
     return;
   }
-  const recent = jobs.slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).slice(0, 5);
+  const active = jobs.filter((j) => JOB_ACTIVE.has(j.status)).length;
+  const terminal = jobs.length - active;
+  summary.textContent = active
+    ? `${active} active · ${terminal} finished`
+    : `${terminal} finished`;
+  const recent = jobs.slice()
+    .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+    .slice(0, 8);
   panel.classList.add("show");
   document.body.classList.add("jobs-visible");
   list.innerHTML = "";
   for (const job of recent) {
-    list.appendChild(create("div", { class: "job" }, [
+    const children = [
       create("span", { class: "doc-id" }, [job.document_id]),
       create("span", { class: `pill ${job.status}` }, [job.status]),
       create("span", { class: "stage" }, [job.stage]),
       create("span", { class: "message" }, [job.message || ""]),
+      renderCompanyPicker(job.document_id),
+      renderJobActions(job),
+    ];
+    const progress = renderJobProgress(job);
+    if (progress) children.push(progress);
+    list.appendChild(create("div", { class: "job" }, children));
+  }
+}
+
+// --- Companies: picker + compliance drawer ---------------------------------
+
+const companyState = {
+  companies: [],              // Company[] from GET /reviewer/companies
+  byKey: new Map(),           // key -> Company
+  byTicker: new Map(),        // UPPER(ticker) -> Company
+  byNumeric: new Map(),       // numeric_code -> Company
+  byName: new Map(),          // normalized name -> Company
+  loaded: false,
+  loadPromise: null,
+  docLinks: {},               // doc_id -> link
+  linksLoaded: false,
+  periods: [],
+  currentPeriodId: "",
+};
+
+function normalizeCompanyName(name) {
+  return (name || "").trim();
+}
+
+async function ensureCompaniesLoaded() {
+  if (companyState.loaded) return;
+  if (!companyState.loadPromise) {
+    companyState.loadPromise = (async () => {
+      try {
+        const response = await fetch("/reviewer/companies");
+        if (!response.ok) return;
+        const payload = await response.json();
+        companyState.companies = payload.companies || [];
+        companyState.byKey.clear();
+        companyState.byTicker.clear();
+        companyState.byNumeric.clear();
+        companyState.byName.clear();
+        for (const company of companyState.companies) {
+          const key = company.ticker || company.numeric_code || company.name_ar;
+          companyState.byKey.set(key, company);
+          if (company.ticker) companyState.byTicker.set(company.ticker.toUpperCase(), company);
+          if (company.numeric_code) companyState.byNumeric.set(company.numeric_code, company);
+          if (company.name_ar) companyState.byName.set(normalizeCompanyName(company.name_ar), company);
+          if (company.short_name_ar) companyState.byName.set(normalizeCompanyName(company.short_name_ar), company);
+        }
+        companyState.loaded = true;
+        populateCompanyDatalist();
+      } catch (err) {
+        console.warn("Failed to load companies", err);
+      }
+    })();
+  }
+  await companyState.loadPromise;
+}
+
+function populateCompanyDatalist() {
+  const datalist = document.getElementById("company-datalist");
+  if (!datalist) return;
+  datalist.innerHTML = "";
+  for (const company of companyState.companies) {
+    const option = document.createElement("option");
+    const parts = [company.ticker, company.name_ar].filter(Boolean);
+    option.value = parts.join(" · ");
+    option.label = company.sector_ar || "";
+    option.dataset.key = company.ticker || company.numeric_code || company.name_ar;
+    datalist.appendChild(option);
+  }
+}
+
+function resolveCompanyFromInput(raw) {
+  const text = (raw || "").trim();
+  if (!text) return null;
+  // Format "TICKER · name" first
+  const bullet = text.split("·");
+  if (bullet.length >= 2) {
+    const ticker = bullet[0].trim().toUpperCase();
+    if (companyState.byTicker.has(ticker)) return companyState.byTicker.get(ticker);
+  }
+  const upper = text.toUpperCase();
+  if (companyState.byTicker.has(upper)) return companyState.byTicker.get(upper);
+  if (companyState.byNumeric.has(text)) return companyState.byNumeric.get(text);
+  if (companyState.byName.has(text)) return companyState.byName.get(text);
+  return null;
+}
+
+async function loadDocumentCompanies() {
+  try {
+    const response = await fetch("/reviewer/document-companies");
+    if (!response.ok) return;
+    const payload = await response.json();
+    companyState.docLinks = payload.links || {};
+    companyState.linksLoaded = true;
+  } catch (err) {
+    console.warn("Failed to load document-company links", err);
+  }
+}
+
+function allPickersForDocument(documentId) {
+  // Every picker in the DOM tagged with the matching data-document-id
+  return document.querySelectorAll(`.company-picker[data-document-id="${CSS.escape(documentId)}"]`);
+}
+
+function syncPickersForDocument(documentId, company) {
+  for (const wrapper of allPickersForDocument(documentId)) {
+    const input = wrapper.querySelector("input");
+    const label = wrapper.querySelector(".co-label");
+    if (!input || !label) continue;
+    if (company) applyLinkedUI(company, input, label, wrapper);
+    else applyUnlinkedUI(input, label, wrapper);
+  }
+}
+
+async function setDocumentCompany(documentId, company, _inputEl, _labelEl, _wrapperEl) {
+  const payload = { company_key: company.ticker || company.numeric_code || company.name_ar };
+  const reviewer = (document.getElementById("reviewer-name").value || "").trim();
+  if (reviewer) payload.linked_by = reviewer;
+  try {
+    const response = await fetch(
+      `/reviewer/documents/by-id/${encodeURIComponent(documentId)}/company`,
+      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) },
+    );
+    if (!response.ok) {
+      let detail = response.statusText;
+      try { detail = (await response.json()).detail || detail; } catch { /* ignore */ }
+      toast(`Link failed: ${detail}`);
+      return;
+    }
+    const data = await response.json();
+    companyState.docLinks[documentId] = data.link;
+    syncPickersForDocument(documentId, data.company);
+    toast(`Linked ${documentId} to ${data.company.ticker || data.company.name_ar}.`);
+    // Refresh the findings view so the inline tag + filter options reflect the link.
+    if (state.bundle) { populateCompanyFilter(); renderList(); }
+  } catch (err) {
+    toast(`Link error: ${err}`);
+  }
+}
+
+async function clearDocumentCompany(documentId, _inputEl, _labelEl, _wrapperEl) {
+  try {
+    const response = await fetch(
+      `/reviewer/documents/by-id/${encodeURIComponent(documentId)}/company`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      toast(`Clear failed: ${response.statusText}`);
+      return;
+    }
+    delete companyState.docLinks[documentId];
+    syncPickersForDocument(documentId, null);
+    toast(`Cleared company for ${documentId}.`);
+    if (state.bundle) { populateCompanyFilter(); renderList(); }
+  } catch (err) {
+    toast(`Clear error: ${err}`);
+  }
+}
+
+function applyLinkedUI(company, inputEl, labelEl, wrapperEl) {
+  wrapperEl.classList.remove("unlinked");
+  wrapperEl.classList.add("linked");
+  labelEl.textContent = company.ticker || company.numeric_code || "linked";
+  labelEl.title = company.name_ar;
+  const parts = [company.ticker, company.name_ar].filter(Boolean);
+  inputEl.value = parts.join(" · ");
+}
+
+function applyUnlinkedUI(inputEl, labelEl, wrapperEl) {
+  wrapperEl.classList.remove("linked");
+  wrapperEl.classList.add("unlinked");
+  labelEl.textContent = "no company";
+  labelEl.title = "This document is not linked to a company yet";
+  inputEl.value = "";
+}
+
+function renderCompanyPicker(documentId) {
+  const wrapper = create("div", {
+    class: "company-picker",
+    dataset: { documentId },
+  }, []);
+  const label = create("span", { class: "co-label" }, [""]);
+  const input = create("input", {
+    type: "text",
+    list: "company-datalist",
+    placeholder: "ticker or name...",
+  }, []);
+  const clear = create("button", {
+    type: "button",
+    class: "co-clear",
+    title: "Clear link",
+  }, ["×"]);
+  const detect = create("button", {
+    type: "button",
+    class: "co-detect",
+    title: "Auto-detect this document's company from its text",
+  }, ["Detect"]);
+  const suggestions = create("div", { class: "co-suggestions" }, []);
+
+  wrapper.appendChild(label);
+  wrapper.appendChild(input);
+  wrapper.appendChild(detect);
+  wrapper.appendChild(clear);
+  wrapper.appendChild(suggestions);
+
+  // Initial state based on cached link
+  const link = companyState.docLinks[documentId];
+  if (link) {
+    const company = companyState.byKey.get(link.company_key)
+      || companyState.byTicker.get(link.company_key.toUpperCase())
+      || companyState.byNumeric.get(link.company_key);
+    if (company) applyLinkedUI(company, input, label, wrapper);
+    else applyUnlinkedUI(input, label, wrapper);
+  } else {
+    applyUnlinkedUI(input, label, wrapper);
+  }
+
+  input.addEventListener("change", async () => {
+    const company = resolveCompanyFromInput(input.value);
+    if (!company) {
+      if (!input.value.trim()) {
+        await clearDocumentCompany(documentId, input, label, wrapper);
+      } else {
+        toast(`No company matches "${input.value}". Pick one from the suggestions.`);
+      }
+      return;
+    }
+    await setDocumentCompany(documentId, company, input, label, wrapper);
+  });
+  clear.addEventListener("click", async () => {
+    await clearDocumentCompany(documentId, input, label, wrapper);
+  });
+  detect.addEventListener("click", async () => {
+    await detectCompanyFor(documentId, suggestions);
+  });
+
+  // Kick off loads if we haven't yet (don't block render).
+  if (!companyState.loaded) ensureCompaniesLoaded();
+  if (!companyState.linksLoaded) loadDocumentCompanies();
+
+  return wrapper;
+}
+
+async function detectCompanyFor(documentId, suggestionsEl) {
+  suggestionsEl.innerHTML = "";
+  suggestionsEl.appendChild(create("span", { class: "co-detecting" }, ["Detecting..."]));
+  try {
+    const response = await fetch(
+      `/reviewer/documents/by-id/${encodeURIComponent(documentId)}/company/detect`,
+    );
+    if (!response.ok) {
+      suggestionsEl.innerHTML = "";
+      toast(`Detect failed: ${response.statusText}`);
+      return;
+    }
+    renderDetectionSuggestions(documentId, suggestionsEl, await response.json());
+  } catch (err) {
+    suggestionsEl.innerHTML = "";
+    toast(`Detect error: ${err}`);
+  }
+}
+
+function renderDetectionSuggestions(documentId, container, payload) {
+  container.innerHTML = "";
+  const reason = payload.reason || "no_match";
+  const candidates = payload.candidates || [];
+  if (!candidates.length) {
+    const msg = reason === "no_text"
+      ? "No extracted text to scan yet. Upload or wait for extraction to finish."
+      : "No company matched the first pages of this document. Pick manually in the input to the left.";
+    container.appendChild(create("span", { class: "co-note" }, [msg]));
+    return;
+  }
+  const header = create("span", { class: "co-note" }, [
+    reason === "ambiguous"
+      ? `Two or more close matches (top ${payload.threshold ?? ""} threshold):`
+      : reason === "below_threshold"
+      ? `No strong match (top score below threshold ${payload.threshold ?? ""}):`
+      : reason === "deep_suggestion"
+      ? `No strong match on the cover pages. Deep-scan suggestions (confirm manually):`
+      : `Suggestions:`,
+  ]);
+  container.appendChild(header);
+  for (const candidate of candidates.slice(0, 3)) {
+    const company = candidate.company;
+    const chip = create("button", {
+      type: "button",
+      class: `co-suggestion ${payload.accepted_key === company.ticker || payload.accepted_key === company.numeric_code || payload.accepted_key === company.name_ar ? "preferred" : ""}`,
+      title: `score ${candidate.score} · hits ${candidate.hits}`,
+      onclick: async () => {
+        await setDocumentCompany(documentId, company);
+        container.innerHTML = "";
+      },
+    }, [
+      create("span", { class: "co-tick" }, [company.ticker || company.numeric_code || "—"]),
+      create("span", { class: "co-fullname" }, [company.name_ar]),
+      create("span", { class: "co-score" }, [`${candidate.score}`]),
+    ]);
+    container.appendChild(chip);
+  }
+}
+
+// --- Compliance drawer -----------------------------------------------------
+
+async function openCompliance() {
+  document.getElementById("compliance-drawer").classList.add("show");
+  document.getElementById("compliance-overlay").classList.add("show");
+  document.getElementById("compliance-drawer").setAttribute("aria-hidden", "false");
+  await Promise.all([ensureCompaniesLoaded(), loadDocumentCompanies(), loadDisclosurePeriods()]);
+  await refreshComplianceReport();
+}
+
+function closeCompliance() {
+  document.getElementById("compliance-drawer").classList.remove("show");
+  document.getElementById("compliance-overlay").classList.remove("show");
+  document.getElementById("compliance-drawer").setAttribute("aria-hidden", "true");
+}
+
+async function loadDisclosurePeriods() {
+  try {
+    const response = await fetch("/reviewer/disclosure-periods");
+    if (!response.ok) return;
+    const payload = await response.json();
+    companyState.periods = payload.periods || [];
+    const select = document.getElementById("compliance-period");
+    const previous = select.value;
+    select.innerHTML = "";
+    if (!companyState.periods.length) {
+      select.appendChild(create("option", { value: "" }, ["No disclosure periods configured"]));
+      companyState.currentPeriodId = "";
+      return;
+    }
+    for (const period of companyState.periods) {
+      const label = period.description
+        ? `${period.period_id} — ${period.description} (due ${period.due_date})`
+        : `${period.period_id} (due ${period.due_date})`;
+      select.appendChild(create("option", { value: period.period_id }, [label]));
+    }
+    const match = companyState.periods.find((p) => p.period_id === previous);
+    companyState.currentPeriodId = (match || companyState.periods[0]).period_id;
+    select.value = companyState.currentPeriodId;
+  } catch (err) {
+    console.warn("Failed to load periods", err);
+  }
+}
+
+async function refreshComplianceReport() {
+  const list = document.getElementById("compliance-list");
+  const totalsEl = document.getElementById("compliance-totals");
+  list.innerHTML = "";
+  totalsEl.innerHTML = "";
+  if (!companyState.currentPeriodId) {
+    list.appendChild(create("div", { class: "empty" }, [
+      create("div", { class: "big" }, ["No disclosure periods configured."]),
+      create("div", { class: "small" }, ["Add one to Data/compliance/disclosure_periods.json and reload."]),
+    ]));
+    return;
+  }
+  try {
+    const url = `/reviewer/compliance?period_id=${encodeURIComponent(companyState.currentPeriodId)}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      list.appendChild(create("div", { class: "empty" }, [
+        create("div", { class: "big" }, [`Compliance load failed (${response.status})`]),
+      ]));
+      return;
+    }
+    const report = await response.json();
+    renderComplianceReport(report);
+  } catch (err) {
+    list.appendChild(create("div", { class: "empty" }, [
+      create("div", { class: "big" }, [`Compliance error: ${err}`]),
     ]));
   }
 }
+
+function renderComplianceReport(report) {
+  const list = document.getElementById("compliance-list");
+  const totalsEl = document.getElementById("compliance-totals");
+
+  totalsEl.innerHTML = "";
+  totalsEl.appendChild(create("span", { class: "chip on" }, [
+    `${report.submitted_on_time_count} on time`,
+  ]));
+  totalsEl.appendChild(create("span", { class: "chip late" }, [
+    `${report.submitted_late_count} late`,
+  ]));
+  totalsEl.appendChild(create("span", { class: "chip miss" }, [
+    `${report.not_submitted_count} not submitted`,
+  ]));
+
+  // Order: late first, then missing, then on-time
+  const buckets = { submitted_late: 0, not_submitted: 1, submitted_on_time: 2 };
+  const entries = report.entries.slice().sort((a, b) => {
+    const bucketDiff = buckets[a.status] - buckets[b.status];
+    if (bucketDiff !== 0) return bucketDiff;
+    return a.company_name_ar.localeCompare(b.company_name_ar, "ar");
+  });
+
+  list.innerHTML = "";
+  if (!entries.length) {
+    list.appendChild(create("div", { class: "empty" }, [
+      create("div", { class: "big" }, ["The registry is empty."]),
+    ]));
+    return;
+  }
+  for (const entry of entries) {
+    const name = create("div", { class: "co-name" }, [entry.company_name_ar]);
+    if (entry.sector_ar) {
+      name.appendChild(create("span", { class: "co-sector" }, [entry.sector_ar]));
+    }
+    const ticker = create("span", { class: "co-ticker" }, [
+      entry.ticker || entry.numeric_code || "—",
+    ]);
+    const metaChildren = [];
+    if (entry.submitted_at) {
+      const when = new Date(entry.submitted_at).toISOString().slice(0, 10);
+      const deltaText = typeof entry.days_from_due === "number"
+        ? (entry.days_from_due <= 0
+          ? `${-entry.days_from_due} day${entry.days_from_due === 0 ? "" : "s"} early`
+          : `${entry.days_from_due} day${entry.days_from_due === 1 ? "" : "s"} late`)
+        : "";
+      metaChildren.push(create("span", {}, [
+        `submitted ${when}${deltaText ? ` · ${deltaText}` : ""}`,
+      ]));
+      if (entry.document_id) {
+        metaChildren.push(create("span", { class: "doc" }, [entry.document_id]));
+      }
+    } else {
+      metaChildren.push(create("span", {}, ["no submission linked"]));
+    }
+    const meta = create("div", { class: "co-meta" }, metaChildren);
+
+    const pillText = {
+      submitted_on_time: "on time",
+      submitted_late: "late",
+      not_submitted: "not submitted",
+    }[entry.status] || entry.status;
+    const pill = create("span", { class: `pill status-${entry.status}` }, [pillText]);
+
+    list.appendChild(create("div", { class: "comp-row" }, [name, ticker, meta, pill]));
+  }
+}
+
+document.getElementById("open-compliance").addEventListener("click", openCompliance);
+document.getElementById("close-compliance").addEventListener("click", closeCompliance);
+document.getElementById("compliance-overlay").addEventListener("click", closeCompliance);
+
+// --- Documents drawer ------------------------------------------------------
+
+const documentsState = {
+  entries: [],
+  filterText: "",
+  filterMode: "",  // "", "unlinked", "linked", "unreviewed", "no_findings"
+  loading: false,
+  open: false,
+};
+
+async function openDocuments() {
+  if (documentsState.open) return;
+  documentsState.open = true;
+  document.getElementById("documents-drawer").classList.add("show");
+  document.getElementById("documents-overlay").classList.add("show");
+  document.getElementById("documents-drawer").setAttribute("aria-hidden", "false");
+  await Promise.all([ensureCompaniesLoaded(), loadDocumentCompanies()]);
+  await loadDocumentsInventory();
+}
+
+function closeDocuments() {
+  if (!documentsState.open) return;
+  documentsState.open = false;
+  document.getElementById("documents-drawer").classList.remove("show");
+  document.getElementById("documents-overlay").classList.remove("show");
+  document.getElementById("documents-drawer").setAttribute("aria-hidden", "true");
+}
+
+async function loadDocumentsInventory() {
+  if (documentsState.loading) return;
+  documentsState.loading = true;
+  const summary = document.getElementById("documents-summary");
+  summary.textContent = "loading documents...";
+  try {
+    const response = await fetch("/reviewer/document-inventory");
+    if (!response.ok) {
+      summary.textContent = `Could not load (${response.status})`;
+      return;
+    }
+    const payload = await response.json();
+    documentsState.entries = payload.entries || [];
+    renderDocuments();
+    updateDocumentsSummary(payload.total, payload.linked, payload.unlinked);
+  } catch (err) {
+    summary.textContent = `Load error: ${err}`;
+  } finally {
+    documentsState.loading = false;
+  }
+}
+
+function updateDocumentsSummary(total, linked, unlinked) {
+  const summary = document.getElementById("documents-summary");
+  summary.textContent = `${total} documents · ${linked} linked · ${unlinked} unlinked`;
+}
+
+function filteredDocumentEntries() {
+  const text = documentsState.filterText.trim().toLowerCase();
+  const mode = documentsState.filterMode;
+  return documentsState.entries.filter((entry) => {
+    if (mode === "unlinked" && entry.link) return false;
+    if (mode === "linked" && !entry.link) return false;
+    if (mode === "unreviewed" && entry.counts.unreviewed === 0) return false;
+    if (mode === "no_findings" && entry.counts.total > 0) return false;
+    if (text) {
+      const hay = [
+        entry.document_id,
+        entry.company ? entry.company.ticker : "",
+        entry.company ? entry.company.numeric_code : "",
+        entry.company ? entry.company.name_ar : "",
+        entry.company ? entry.company.short_name_ar : "",
+      ].join(" ").toLowerCase();
+      if (!hay.includes(text)) return false;
+    }
+    return true;
+  });
+}
+
+function renderDocuments() {
+  const list = document.getElementById("documents-list");
+  list.innerHTML = "";
+  const entries = filteredDocumentEntries();
+  if (!entries.length) {
+    list.appendChild(create("div", { class: "empty" }, [
+      create("div", { class: "big" }, ["No documents match the filters."]),
+    ]));
+    return;
+  }
+  for (const entry of entries) {
+    list.appendChild(renderDocumentRow(entry));
+  }
+}
+
+function renderDocumentRow(entry) {
+  // Column 1: id + meta chips (pdf, extracted, judged, submitted date)
+  const idBlock = create("div", {}, [create("div", { class: "doc-id" }, [entry.document_id])]);
+  const metaChips = [];
+  if (entry.pdf_present) metaChips.push(create("span", { class: "chip ok" }, ["pdf"]));
+  else metaChips.push(create("span", { class: "chip bad" }, ["no pdf"]));
+  if (entry.extracted) metaChips.push(create("span", { class: "chip ok" }, ["extracted"]));
+  if (entry.judged) metaChips.push(create("span", { class: "chip ok" }, ["judged"]));
+  else metaChips.push(create("span", { class: "chip warn" }, ["not judged"]));
+  if (entry.submitted_at) {
+    const date = new Date(entry.submitted_at).toISOString().slice(0, 10);
+    metaChips.push(create("span", { class: "chip" }, [`submitted ${date}`]));
+  }
+  idBlock.appendChild(create("div", { class: "doc-meta" }, metaChips));
+
+  // Column 2: counts
+  const c = entry.counts;
+  const countsBlock = create("div", { class: "doc-counts" }, [
+    create("div", { class: "count-row" }, [
+      create("span", { class: "count met" }, [`${c.met} Met`]),
+      create("span", { class: "count notmet" }, [`${c.not_met} Not Met`]),
+      create("span", { class: "count review" }, [`${c.needs_review} Needs Review`]),
+    ]),
+    create("div", { class: "count-row" }, [
+      create("span", { class: "count" }, [`${c.reviewed} reviewed · ${c.unreviewed} unreviewed`]),
+    ]),
+  ]);
+
+  // Column 3: picker + actions
+  const picker = renderCompanyPicker(entry.document_id);
+  const openBtn = create("button", {
+    type: "button", class: "btn ghost compact",
+    title: "Jump to the first finding for this document",
+    onclick: () => jumpToDocument(entry.document_id),
+  }, ["Open findings"]);
+  const deleteBtn = create("button", {
+    type: "button", class: "btn ghost compact danger",
+    title: "Delete the PDF and every stored trace of this document",
+    onclick: () => deleteDocumentFromDrawer(entry.document_id),
+  }, ["Delete"]);
+  const actions = create("div", { class: "doc-actions" }, [
+    picker,
+    create("div", { class: "doc-action-row" }, [openBtn, deleteBtn]),
+  ]);
+
+  return create("div", { class: "doc-row" }, [idBlock, countsBlock, actions]);
+}
+
+function jumpToDocument(documentId) {
+  if (!state.bundle) return;
+  const index = state.bundle.findings.findIndex((f) => f.document_id === documentId);
+  if (index < 0) {
+    toast(`No findings yet for ${documentId}.`);
+    return;
+  }
+  closeDocuments();
+  selectIndex(index);
+}
+
+async function deleteDocumentFromDrawer(documentId) {
+  await deleteDocument(documentId);
+  // After the delete completes, refresh the inventory in place.
+  await loadDocumentsInventory();
+}
+
+document.getElementById("open-documents").addEventListener("click", openDocuments);
+document.getElementById("close-documents").addEventListener("click", closeDocuments);
+document.getElementById("documents-overlay").addEventListener("click", closeDocuments);
+document.getElementById("documents-filter").addEventListener("input", (e) => {
+  documentsState.filterText = e.target.value;
+  renderDocuments();
+});
+document.getElementById("documents-filter-mode").addEventListener("change", (e) => {
+  documentsState.filterMode = e.target.value;
+  renderDocuments();
+});
+
+document.getElementById("compliance-period").addEventListener("change", (e) => {
+  companyState.currentPeriodId = e.target.value;
+  refreshComplianceReport();
+});
+document.getElementById("bulk-detect").addEventListener("click", runBulkDetect);
+
+// --- Disclosure periods: Manage panel --------------------------------------
+
+function renderPeriodsManager() {
+  const list = document.getElementById("periods-manager-list");
+  list.innerHTML = "";
+  const periods = companyState.periods || [];
+  if (!periods.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-row";
+    empty.textContent = "No periods configured yet. Add one below.";
+    list.appendChild(empty);
+    return;
+  }
+  for (const period of periods) {
+    const row = document.createElement("div");
+    row.className = "period-row";
+    row.innerHTML = "";
+    const pid = document.createElement("span");
+    pid.className = "pid";
+    pid.textContent = period.period_id;
+    const desc = document.createElement("span");
+    desc.className = "pdesc";
+    desc.textContent = period.description || "(no description)";
+    const due = document.createElement("span");
+    due.className = "pdue";
+    due.textContent = `due ${period.due_date}`;
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn ghost compact danger";
+    del.textContent = "Delete";
+    del.title = `Delete period ${period.period_id}`;
+    del.addEventListener("click", () => deletePeriod(period.period_id));
+    row.append(pid, desc, due, del);
+    list.appendChild(row);
+  }
+}
+
+async function deletePeriod(periodId) {
+  if (!confirm(`Delete period ${periodId}? This only removes the deadline entry; linked documents stay as-is.`)) return;
+  try {
+    const response = await fetch(`/reviewer/disclosure-periods/${encodeURIComponent(periodId)}`, {
+      method: "DELETE",
+    });
+    if (response.status !== 204) {
+      const body = await response.json().catch(() => ({}));
+      toast(`Delete failed: ${body.detail || response.status}`);
+      return;
+    }
+    await loadDisclosurePeriods();
+    renderPeriodsManager();
+    // If the deleted one was selected, refresh the report (will clear).
+    if (companyState.currentPeriodId === periodId) {
+      companyState.currentPeriodId = (companyState.periods[0] || {}).period_id || "";
+      refreshComplianceReport();
+    }
+  } catch (err) {
+    toast(`Delete error: ${err}`);
+  }
+}
+
+document.getElementById("manage-periods-toggle").addEventListener("click", () => {
+  const panel = document.getElementById("periods-manager");
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) renderPeriodsManager();
+});
+
+document.getElementById("period-create-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const status = document.getElementById("period-create-status");
+  status.textContent = "saving...";
+  const payload = {
+    period_id: document.getElementById("period-id").value.trim(),
+    description: document.getElementById("period-description").value.trim(),
+    due_date: document.getElementById("period-due").value,
+    replace: false,
+  };
+  try {
+    const response = await fetch("/reviewer/disclosure-periods", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (response.status === 201) {
+      status.textContent = `Added ${payload.period_id}.`;
+      document.getElementById("period-create-form").reset();
+      await loadDisclosurePeriods();
+      renderPeriodsManager();
+    } else {
+      const body = await response.json().catch(() => ({}));
+      status.textContent = `Error: ${body.detail || response.status}`;
+    }
+  } catch (err) {
+    status.textContent = `Save error: ${err}`;
+  }
+});
+
+async function runBulkDetect() {
+  const report = document.getElementById("bulk-detect-report");
+  const button = document.getElementById("bulk-detect");
+  report.innerHTML = "";
+  report.appendChild(create("div", { class: "co-detecting" }, ["Scanning extracted documents and auto-linking high-confidence matches..."]));
+  button.disabled = true;
+  try {
+    const response = await fetch("/reviewer/documents/companies/detect-all?apply=true", {
+      method: "POST",
+    });
+    if (!response.ok) {
+      report.innerHTML = "";
+      toast(`Bulk detect failed: ${response.statusText}`);
+      return;
+    }
+    const payload = await response.json();
+    renderBulkDetectReport(payload);
+    // Pull fresh links so pickers and the finding list reflect the new state.
+    await loadDocumentCompanies();
+    syncAllPickersFromState();
+    if (state.bundle) { populateCompanyFilter(); renderList(); }
+    await refreshComplianceReport();
+    toast(
+      `Linked ${payload.linked} docs. ${payload.ambiguous} ambiguous, `
+      + `${payload.below_threshold} low score, ${payload.no_match} unmatched, `
+      + `${payload.skipped_existing} already linked.`,
+    );
+  } catch (err) {
+    report.innerHTML = "";
+    toast(`Bulk detect error: ${err}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function syncAllPickersFromState() {
+  for (const [docId, link] of Object.entries(companyState.docLinks)) {
+    const company = companyState.byKey.get(link.company_key)
+      || companyState.byTicker.get(link.company_key.toUpperCase())
+      || companyState.byNumeric.get(link.company_key);
+    syncPickersForDocument(docId, company || null);
+  }
+  // Any picker whose doc no longer has a link should go back to unlinked.
+  for (const wrapper of document.querySelectorAll(".company-picker")) {
+    const docId = wrapper.dataset.documentId;
+    if (docId && !companyState.docLinks[docId]) {
+      syncPickersForDocument(docId, null);
+    }
+  }
+}
+
+function renderBulkDetectReport(payload) {
+  const report = document.getElementById("bulk-detect-report");
+  report.innerHTML = "";
+  const summary = create("div", { class: "bulk-summary" }, [
+    `Scanned ${payload.scanned} · Linked ${payload.linked} · `,
+    `Ambiguous ${payload.ambiguous} · Below threshold ${payload.below_threshold} · `,
+    `Unmatched ${payload.no_match} · Already linked ${payload.skipped_existing}`,
+  ]);
+  report.appendChild(summary);
+
+  // Only surface rows that need the reviewer's attention.
+  const attention = (payload.entries || []).filter((entry) =>
+    entry.reason === "ambiguous" || entry.reason === "below_threshold");
+  if (!attention.length) return;
+  report.appendChild(create("div", { class: "bulk-attention-title" }, [
+    "These documents need you to pick manually:",
+  ]));
+  for (const entry of attention) {
+    const row = create("div", { class: "bulk-row" }, [
+      create("span", { class: "bulk-doc" }, [entry.document_id]),
+      create("span", { class: "bulk-reason" }, [entry.reason === "ambiguous" ? "ambiguous" : "low score"]),
+    ]);
+    const chips = create("div", { class: "bulk-chips" }, []);
+    for (const candidate of (entry.candidates || []).slice(0, 3)) {
+      const company = candidate.company;
+      chips.appendChild(create("button", {
+        type: "button",
+        class: "co-suggestion",
+        title: `score ${candidate.score} · hits ${candidate.hits}`,
+        onclick: async () => {
+          await setDocumentCompany(entry.document_id, company);
+          chips.innerHTML = "";
+          chips.appendChild(create("span", { class: "co-note" }, [
+            `Linked to ${company.ticker || company.name_ar}.`,
+          ]));
+        },
+      }, [
+        create("span", { class: "co-tick" }, [company.ticker || company.numeric_code || "—"]),
+        create("span", { class: "co-fullname" }, [company.name_ar]),
+        create("span", { class: "co-score" }, [`${candidate.score}`]),
+      ]));
+    }
+    row.appendChild(chips);
+    report.appendChild(row);
+  }
+}
+
+// Kick off a background prefetch so the picker is instant on the first job row.
+ensureCompaniesLoaded();
+loadDocumentCompanies();
+
+// --- Requirements register drawer ------------------------------------------
+
+const registerState = {
+  rows: [],
+  initial: new Map(),      // requirement_id -> original poc_selected (bool)
+  current: new Map(),      // requirement_id -> current poc_selected (bool)
+  filterText: "",
+  filterSection: "",
+  loading: false,
+  open: false,
+};
+
+function openRegister() {
+  if (registerState.open) return;
+  registerState.open = true;
+  document.getElementById("register-drawer").classList.add("show");
+  document.getElementById("register-overlay").classList.add("show");
+  document.getElementById("register-drawer").setAttribute("aria-hidden", "false");
+  loadRegister();
+}
+
+function closeRegister() {
+  if (!registerState.open) return;
+  if (hasRegisterChanges() && !confirm("Discard unsaved selection changes?")) return;
+  registerState.open = false;
+  document.getElementById("register-drawer").classList.remove("show");
+  document.getElementById("register-overlay").classList.remove("show");
+  document.getElementById("register-drawer").setAttribute("aria-hidden", "true");
+}
+
+async function loadRegister() {
+  if (registerState.loading) return;
+  registerState.loading = true;
+  const summary = document.getElementById("register-summary");
+  summary.textContent = "loading requirements...";
+  try {
+    const response = await fetch("/reviewer/requirements");
+    if (!response.ok) {
+      summary.textContent = "Could not load requirements.";
+      return;
+    }
+    const payload = await response.json();
+    adoptRegisterPayload(payload);
+  } catch (err) {
+    summary.textContent = `Load error: ${err}`;
+  } finally {
+    registerState.loading = false;
+  }
+}
+
+function adoptRegisterPayload(payload) {
+  registerState.rows = payload.rows || [];
+  registerState.initial = new Map(registerState.rows.map((r) => [r.requirement_id, !!r.poc_selected]));
+  registerState.current = new Map(registerState.initial);
+  renderRegister();
+  populateSectionFilter();
+  updateRegisterSummary(payload.selected_count, payload.total_count);
+}
+
+function populateSectionFilter() {
+  const select = document.getElementById("register-section-filter");
+  const previous = select.value;
+  const sections = Array.from(new Set(registerState.rows.map((r) => r.section).filter(Boolean))).sort();
+  select.innerHTML = "";
+  select.appendChild(create("option", { value: "" }, ["All sections"]));
+  for (const section of sections) {
+    select.appendChild(create("option", { value: section }, [section]));
+  }
+  select.value = sections.includes(previous) ? previous : "";
+}
+
+function updateRegisterSummary(selected, total) {
+  const summary = document.getElementById("register-summary");
+  summary.textContent = `${selected} of ${total} requirements selected for the next upload.`;
+  const dirty = document.getElementById("register-dirty");
+  const changedIds = changedRegisterIds();
+  if (!changedIds.length) {
+    dirty.textContent = "No pending changes.";
+  } else {
+    dirty.textContent = `${changedIds.length} pending change${changedIds.length === 1 ? "" : "s"}.`;
+  }
+  document.getElementById("register-save").disabled = !changedIds.length;
+  document.getElementById("register-revert").disabled = !changedIds.length;
+}
+
+function changedRegisterIds() {
+  const changed = [];
+  for (const [id, current] of registerState.current.entries()) {
+    const original = registerState.initial.get(id);
+    if (original !== current) changed.push(id);
+  }
+  return changed;
+}
+
+function hasRegisterChanges() {
+  return changedRegisterIds().length > 0;
+}
+
+function filteredRegisterRows() {
+  const text = registerState.filterText.trim().toLowerCase();
+  const section = registerState.filterSection;
+  return registerState.rows.filter((row) => {
+    if (section && row.section !== section) return false;
+    if (!text) return true;
+    const haystack = [
+      row.requirement_id,
+      row.section,
+      row.requirement_text_ar,
+      row.requirement_text_en,
+      row.evaluation_method,
+      row.requirement_type,
+    ].join(" ").toLowerCase();
+    return haystack.includes(text);
+  });
+}
+
+function renderRegister() {
+  const list = document.getElementById("register-list");
+  list.innerHTML = "";
+  const rows = filteredRegisterRows();
+  if (!rows.length) {
+    list.appendChild(create("div", { class: "empty" }, [
+      create("div", { class: "big" }, ["No requirements match the filters."]),
+    ]));
+    return;
+  }
+  for (const row of rows) {
+    const selected = !!registerState.current.get(row.requirement_id);
+    const checkbox = create("input", { type: "checkbox" }, []);
+    checkbox.checked = selected;
+    checkbox.addEventListener("change", () => {
+      registerState.current.set(row.requirement_id, checkbox.checked);
+      container.classList.toggle("selected", checkbox.checked);
+      updateRegisterSummary(
+        Array.from(registerState.current.values()).filter(Boolean).length,
+        registerState.rows.length,
+      );
+    });
+
+    const idBlock = create("div", {}, [
+      create("div", { class: "req-id" }, [row.requirement_id]),
+      create("div", { class: "req-meta" }, [
+        create("span", {}, [row.section || "no section"]),
+        create("span", {}, [row.evaluation_method || "no method"]),
+        row.requirement_type ? create("span", {}, [row.requirement_type]) : null,
+      ]),
+    ]);
+
+    const textChildren = [];
+    if (row.requirement_text_ar) {
+      textChildren.push(create("div", { class: "req-text", dir: "rtl" }, [row.requirement_text_ar]));
+    }
+    if (row.requirement_text_en) {
+      textChildren.push(create("div", { class: "req-text", dir: "ltr" }, [row.requirement_text_en]));
+    }
+    if (!textChildren.length) {
+      textChildren.push(create("div", { class: "req-text" }, ["(no requirement text)"]));
+    }
+    const textBlock = create("div", {}, textChildren);
+
+    const container = create("div", { class: `register-row${selected ? " selected" : ""}` }, [
+      checkbox, idBlock, textBlock,
+    ]);
+    list.appendChild(container);
+  }
+}
+
+function applyBulkSelection(value) {
+  const filtered = filteredRegisterRows();
+  if (!filtered.length) return;
+  for (const row of filtered) {
+    registerState.current.set(row.requirement_id, value);
+  }
+  renderRegister();
+  updateRegisterSummary(
+    Array.from(registerState.current.values()).filter(Boolean).length,
+    registerState.rows.length,
+  );
+}
+
+async function saveRegisterChanges() {
+  const changed = changedRegisterIds();
+  if (!changed.length) return;
+  const selections = {};
+  for (const id of changed) selections[id] = !!registerState.current.get(id);
+
+  const button = document.getElementById("register-save");
+  button.disabled = true;
+  try {
+    const response = await fetch("/reviewer/requirements", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selections }),
+    });
+    if (!response.ok) {
+      let detail = response.statusText;
+      try { detail = (await response.json()).detail || detail; } catch { /* ignore */ }
+      toast(`Save failed: ${detail}`);
+      return;
+    }
+    const payload = await response.json();
+    adoptRegisterPayload(payload);
+    const unknown = payload.unknown_requirement_ids || [];
+    if (unknown.length) {
+      toast(`Saved. These ids were ignored: ${unknown.join(", ")}.`);
+    } else {
+      toast(`Saved ${changed.length} selection change${changed.length === 1 ? "" : "s"}. Effective on the next upload.`);
+    }
+  } catch (err) {
+    toast(`Save error: ${err}`);
+  } finally {
+    document.getElementById("register-save").disabled = !hasRegisterChanges();
+  }
+}
+
+function revertRegisterChanges() {
+  registerState.current = new Map(registerState.initial);
+  renderRegister();
+  updateRegisterSummary(
+    Array.from(registerState.current.values()).filter(Boolean).length,
+    registerState.rows.length,
+  );
+}
+
+document.getElementById("open-register").addEventListener("click", openRegister);
+document.getElementById("close-register").addEventListener("click", closeRegister);
+document.getElementById("register-overlay").addEventListener("click", closeRegister);
+document.getElementById("register-filter").addEventListener("input", (e) => {
+  registerState.filterText = e.target.value;
+  renderRegister();
+});
+document.getElementById("register-section-filter").addEventListener("change", (e) => {
+  registerState.filterSection = e.target.value;
+  renderRegister();
+});
+document.getElementById("register-select-filtered").addEventListener("click", () => applyBulkSelection(true));
+document.getElementById("register-deselect-filtered").addEventListener("click", () => applyBulkSelection(false));
+document.getElementById("register-save").addEventListener("click", saveRegisterChanges);
+document.getElementById("register-revert").addEventListener("click", revertRegisterChanges);
 
 loadBundle();
 pollJobs();

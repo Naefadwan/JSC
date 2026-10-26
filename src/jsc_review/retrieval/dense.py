@@ -100,6 +100,79 @@ def build_index(
     )
 
 
+def append_chunks(
+    index: DenseIndex,
+    new_chunks: Sequence[IndexedChunk],
+    encoder: TextEncoder,
+    *,
+    batch_size: int = 16,
+) -> DenseIndex:
+    """Encode new chunks and add them to the FAISS index in place.
+
+    Chunks whose ``chunk_id`` already appears in ``index`` are skipped so a
+    repeated upload does not duplicate vectors.
+    """
+
+    if not new_chunks:
+        return index
+    seen_ids = {chunk.chunk_id for chunk in index.chunks}
+    additions = [chunk for chunk in new_chunks if chunk.chunk_id not in seen_ids]
+    if not additions:
+        return index
+    texts = [chunk.text for chunk in additions]
+    batches = [
+        encoder.encode(texts[start : start + batch_size]).astype(np.float32)
+        for start in range(0, len(texts), batch_size)
+    ]
+    vectors = _normalize(np.vstack(batches))
+    if index.faiss_index.d != int(vectors.shape[1]):
+        raise ValueError(
+            f"Encoder output dim {vectors.shape[1]} does not match index dim {index.faiss_index.d}"
+        )
+    index.faiss_index.add(vectors)
+    return DenseIndex(
+        chunks=index.chunks + tuple(additions),
+        faiss_index=index.faiss_index,
+        encoder=encoder,
+    )
+
+
+def remove_document(index: DenseIndex, document_id: str) -> tuple[DenseIndex, int]:
+    """Return a new dense index with every chunk for ``document_id`` dropped.
+
+    The underlying FAISS ``IndexFlatIP`` does not support in-place deletion,
+    so this reconstructs the retained vectors with ``faiss_index.reconstruct``
+    and copies them into a fresh index of the same dimension. The second
+    element of the returned tuple is the number of chunks removed.
+    """
+
+    if not index.chunks:
+        return index, 0
+    kept_pairs: list[tuple[int, IndexedChunk]] = [
+        (position, chunk)
+        for position, chunk in enumerate(index.chunks)
+        if chunk.document_id != document_id
+    ]
+    removed = len(index.chunks) - len(kept_pairs)
+    if removed == 0:
+        return index, 0
+    dim = int(index.faiss_index.d)
+    rebuilt = faiss.IndexFlatIP(dim)
+    if kept_pairs:
+        vectors = np.vstack(
+            [index.faiss_index.reconstruct(position) for position, _ in kept_pairs]
+        ).astype(np.float32)
+        rebuilt.add(vectors)
+    return (
+        DenseIndex(
+            chunks=tuple(chunk for _, chunk in kept_pairs),
+            faiss_index=rebuilt,
+            encoder=index.encoder,
+        ),
+        removed,
+    )
+
+
 def save_index(index: DenseIndex, index_path: Path) -> Path:
     """Write the FAISS index and the chunk metadata beside it."""
 
