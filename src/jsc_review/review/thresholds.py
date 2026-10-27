@@ -175,11 +175,10 @@ def _match(
             and cer_store is not None
             and cer_store.allows_verified_evidence(document_id, found.page or -1)
         ):
-            cer = cer_store.cer_for(document_id, found.page or -1) or 0.0
-            promoted_reason = (
-                f"{found.reason} معدل خطأ OCR المقاس على هذه الصفحة "
-                f"{cer * 100:.2f}٪ وهو ضمن الحد المسموح به."
+            justification = (
+                cer_store.verification_reason(document_id, found.page or -1) or ""
             )
+            promoted_reason = f"{found.reason} {justification}".strip()
             return ThresholdMatch(
                 status="Met",
                 reason=promoted_reason,

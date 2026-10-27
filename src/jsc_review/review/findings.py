@@ -527,15 +527,14 @@ def _review_heading(
     if ocr_found is not None:
         page_number, variant, excerpt = ocr_found
         if cer_store is not None and cer_store.allows_verified_evidence(document_id, page_number):
-            cer = cer_store.cer_for(document_id, page_number) or 0.0
+            justification = cer_store.verification_reason(document_id, page_number) or ""
             return _result(
                 requirement,
                 status="Met",
                 reason=(
                     f"تم التعرّف على عنوان القائمة التالي من نص OCR: {variant}. "
-                    f"معدل خطأ OCR المقاس على هذه الصفحة {cer * 100:.2f}٪ وهو "
-                    "ضمن الحد المسموح به."
-                ),
+                    f"{justification}"
+                ).strip(),
                 evidence=_evidence(
                     document_id,
                     page_number,
@@ -613,15 +612,14 @@ def _review_multi_anchor(
     if ocr_found is not None:
         page_number, excerpt = ocr_found
         if cer_store is not None and cer_store.allows_verified_evidence(document_id, page_number):
-            cer = cer_store.cer_for(document_id, page_number) or 0.0
+            justification = cer_store.verification_reason(document_id, page_number) or ""
             return _result(
                 requirement,
                 status="Met",
                 reason=(
                     "تم التحقق من حضور كل العبارات المطلوبة على الصفحة ذاتها من نص OCR "
-                    f"(الصفحة {page_number}). معدل خطأ OCR المقاس {cer * 100:.2f}٪ "
-                    "وهو ضمن الحد المسموح به."
-                ),
+                    f"(الصفحة {page_number}). {justification}"
+                ).strip(),
                 evidence=_evidence(
                     document_id,
                     page_number,
@@ -699,14 +697,14 @@ def _review_early_page(
     if ocr_found is not None:
         page_number, _variant, excerpt = ocr_found
         if cer_store is not None and cer_store.allows_verified_evidence(document_id, page_number):
-            cer = cer_store.cer_for(document_id, page_number) or 0.0
+            justification = cer_store.verification_reason(document_id, page_number) or ""
             return _result(
                 requirement,
                 status="Met",
                 reason=(
                     f"تم التعرّف على عنوان الفصل من نص OCR على الصفحة {page_number}. "
-                    f"معدل خطأ OCR المقاس {cer * 100:.2f}٪ ضمن الحد المسموح به."
-                ),
+                    f"{justification}"
+                ).strip(),
                 evidence=_evidence(
                     document_id,
                     page_number,
@@ -797,14 +795,14 @@ def _review_table_structure(
         if cer_store is not None and cer_store.allows_verified_evidence(document_id, page_number):
             text = ocr_pages[page_number]
             if _has_table_structure(text, min_cols=min_cols, min_rows=min_rows):
-                cer = cer_store.cer_for(document_id, page_number) or 0.0
+                justification = cer_store.verification_reason(document_id, page_number) or ""
                 return _result(
                     requirement,
                     status="Met",
                     reason=(
                         f"تم التعرّف على بنية الجدول من نص OCR على الصفحة {page_number}. "
-                        f"معدل خطأ OCR المقاس {cer * 100:.2f}٪ ضمن الحد المسموح به."
-                    ),
+                        f"{justification}"
+                    ).strip(),
                     evidence=_evidence(
                         document_id,
                         page_number,

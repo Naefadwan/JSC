@@ -19,6 +19,7 @@ from jsc_review.companies.autolink import (
     merge_pages_with_ocr,
 )
 from jsc_review.core.settings import get_settings
+from jsc_review.documents.cer_measurement import load_measurements
 from jsc_review.retrieval import bm25 as bm25_module
 from jsc_review.retrieval import dense as dense_module
 from jsc_review.retrieval.embedding import (
@@ -65,6 +66,12 @@ def main() -> int:
         dense = dense_bare.with_encoder(encoder)
         print(f"Dense chunks: {len(dense.chunks)}")
 
+    cer_store = load_measurements(settings.cer_measurements_path)
+    print(
+        f"CER store: {len(cer_store.measurements)} measurements, "
+        f"{len(cer_store.anchor_consensus)} consensus records"
+    )
+
     documents = sorted(path.stem for path in settings.extracted_dir.glob("*.json"))
     print(f"Documents: {len(documents)}")
 
@@ -94,7 +101,9 @@ def main() -> int:
         for req in requirements:
             key = (doc, req.requirement_id)
             new_result = judge_requirement(
-                doc, req, pages, ocr_pages, bm25, dense=dense
+                doc, req, pages, ocr_pages, bm25,
+                dense=dense,
+                cer_store=cer_store,
             )
             after_review[new_result.human_review] = after_review.get(new_result.human_review, 0) + 1
             after_status[new_result.status] = after_status.get(new_result.status, 0) + 1

@@ -177,7 +177,12 @@ def remove_cer_measurements_for_document(measurements_path: Path | None, documen
     store = load_measurements(measurements_path)
     rebuilt, removed = remove_document_measurements(store, document_id)
     if removed:
-        save_measurements(rebuilt.measurements, measurements_path, threshold=rebuilt.threshold)
+        save_measurements(
+            rebuilt.measurements,
+            measurements_path,
+            threshold=rebuilt.threshold,
+            anchor_consensus=rebuilt.anchor_consensus,
+        )
     return removed
 
 
