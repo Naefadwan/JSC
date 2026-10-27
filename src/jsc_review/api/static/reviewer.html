@@ -742,6 +742,194 @@
     display: flex; gap: 6px;
   }
 
+  /* ------------------------------------------------- scorecard drawer -- */
+  #scorecard-overlay {
+    position: fixed; inset: 0;
+    background: rgba(16, 24, 40, 0.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 40;
+  }
+  #scorecard-overlay.show { opacity: 1; pointer-events: auto; }
+  #scorecard-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(760px, 100vw);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(16, 24, 40, 0.08);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .22s ease;
+    z-index: 50;
+  }
+  #scorecard-drawer.show { transform: translateX(0); }
+  #scorecard-drawer .drawer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #scorecard-drawer .drawer-header .title-block { min-width: 0; flex: 1 1 auto; }
+  #scorecard-drawer .drawer-header h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  #scorecard-drawer .drawer-header .drawer-sub { margin: 0; }
+  #scorecard-drawer .drawer-header .header-actions {
+    display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+  }
+  #scorecard-drawer .hit5-toggle {
+    display: inline-flex; gap: 6px; align-items: center;
+    font-size: 11px; color: var(--text-muted);
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    cursor: pointer; white-space: nowrap;
+  }
+  #scorecard-drawer .hit5-toggle input { margin: 0; }
+  #scorecard-drawer .drawer-list { flex: 1; overflow-y: auto; padding: 10px 20px 20px; }
+  #scorecard-drawer .drawer-toolbar {
+    display: flex; gap: 10px; align-items: center;
+    padding: 10px 20px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .scorecard-metric {
+    display: grid;
+    grid-template-columns: 1fr 110px 110px 90px;
+    gap: 12px; align-items: center;
+    padding: 12px 0; border-top: 1px solid var(--border);
+  }
+  .scorecard-metric:first-of-type { border-top: none; }
+  .scorecard-metric .name {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+    color: var(--text);
+  }
+  .scorecard-metric .description {
+    font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4;
+  }
+  .scorecard-metric .notes {
+    font-size: 11px; color: var(--text-faint); margin-top: 2px; font-style: italic;
+  }
+  .scorecard-metric .value, .scorecard-metric .target {
+    text-align: right; font-size: 13px; font-variant-numeric: tabular-nums;
+  }
+  .scorecard-metric .value { font-weight: 600; }
+  .scorecard-metric .value.na { color: var(--text-faint); font-weight: 400; font-style: italic; }
+  .scorecard-metric .target { color: var(--text-muted); }
+  .scorecard-metric .flag {
+    text-align: center; font-size: 11px; font-weight: 600;
+    padding: 4px 8px; border-radius: var(--radius-pill);
+  }
+  .scorecard-metric .flag.pass { background: var(--met-bg); color: var(--met-fg); }
+  .scorecard-metric .flag.fail { background: var(--notmet-bg); color: var(--notmet-fg); }
+  .scorecard-metric .flag.na { background: #eef0f3; color: var(--text-faint); }
+
+  /* ------------------------------------------------- golden drawer ----- */
+  #golden-overlay {
+    position: fixed; inset: 0;
+    background: rgba(16, 24, 40, 0.28);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 40;
+  }
+  #golden-overlay.show { opacity: 1; pointer-events: auto; }
+  #golden-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(960px, 100vw);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(16, 24, 40, 0.08);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .22s ease;
+    z-index: 50;
+  }
+  #golden-drawer.show { transform: translateX(0); }
+  #golden-drawer .drawer-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--border);
+  }
+  #golden-drawer .drawer-header h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  #golden-drawer .drawer-toolbar {
+    display: flex; gap: 10px; align-items: center;
+    padding: 12px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  #golden-drawer .drawer-list { flex: 1; overflow-y: auto; padding: 4px 20px 20px; }
+  .golden-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.3fr) 1fr 240px;
+    gap: 12px 16px; align-items: start;
+    padding: 14px 0; border-top: 1px solid var(--border);
+  }
+  .golden-row:first-of-type { border-top: none; }
+  .golden-row .meta {
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 12px; color: var(--text-muted);
+  }
+  .golden-row .meta .ids {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text); font-weight: 600;
+  }
+  .golden-row .meta .chip {
+    padding: 2px 8px; border-radius: var(--radius-pill);
+    background: #eef0f3; color: var(--text-muted); font-size: 10px;
+    display: inline-block;
+  }
+  .golden-row .meta .chip.met { background: var(--met-bg); color: var(--met-fg); }
+  .golden-row .meta .chip.notmet { background: var(--notmet-bg); color: var(--notmet-fg); }
+  .golden-row .meta .chip.review { background: var(--review-bg); color: var(--review-fg); }
+  .golden-row .evidence {
+    font-size: 12px; color: var(--text);
+    line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    background: #f8fafc; padding: 8px 10px; border-radius: var(--radius-sm);
+    max-height: 160px; overflow-y: auto;
+  }
+  .golden-row .evidence.empty { color: var(--text-faint); font-style: italic; background: transparent; padding: 0; }
+  .golden-row .evidence.gt { background: #f0fdf4; border-left: 3px solid var(--met-fg); }
+  .golden-row .evidence-section-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-faint); margin: 6px 0 2px;
+  }
+  .golden-row .evidence-section-label.gt { color: var(--met-fg); margin-top: 10px; }
+  .golden-row .evidence-section-label .evidence-by {
+    text-transform: none; letter-spacing: 0; color: var(--text-faint); font-weight: 400;
+  }
+  .golden-row .evidence-block { display: flex; flex-direction: column; }
+  .golden-row .pin-form {
+    display: grid; grid-template-columns: 90px 1fr; gap: 6px;
+    align-items: start; margin-top: 8px;
+  }
+  .golden-row .pin-form .actions {
+    grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end;
+  }
+  .golden-row .pin-form .input.compact { font-size: 11px; padding: 4px 6px; }
+  .golden-row .pin-form textarea.input.compact { min-height: 40px; resize: vertical; }
+  .golden-row .labels { display: flex; flex-direction: column; gap: 8px; }
+  .golden-row .labels .label-row {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--panel);
+  }
+  .golden-row .labels .label-row.me { border-color: var(--accent); background: #f0f6ff; }
+  .golden-row .labels .label-row .top {
+    display: flex; justify-content: space-between; align-items: center; font-size: 11px;
+  }
+  .golden-row .labels .label-row .top .who {
+    font-weight: 600; color: var(--text);
+  }
+  .golden-row .labels .label-row .top .status { font-size: 10px; }
+  .golden-row .labels .label-row .reason {
+    font-size: 11px; color: var(--text-muted); line-height: 1.4;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .golden-row .labels .me-form { display: flex; flex-direction: column; gap: 6px; }
+  .golden-row .labels .me-form select,
+  .golden-row .labels .me-form textarea {
+    font-size: 11px; padding: 4px 6px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  }
+  .golden-row .labels .me-form textarea { min-height: 48px; resize: vertical; }
+  .golden-row .labels .me-form .actions { display: flex; justify-content: space-between; gap: 6px; }
+  .golden-row .agreement { font-size: 11px; }
+  .golden-row .agreement.agree { color: var(--met-fg); font-weight: 600; }
+  .golden-row .agreement.disagree { color: var(--notmet-fg); font-weight: 600; }
+  .golden-row .agreement.single { color: var(--review-fg); font-weight: 600; }
+  .golden-row .agreement.unlabeled { color: var(--text-faint); font-style: italic; }
+
   /* ------------------------------------------------- periods manager --- */
   .periods-manager {
     padding: 10px 20px 14px;
@@ -834,6 +1022,8 @@
     <button id="open-register" type="button" class="btn ghost" title="Choose which requirements the pipeline runs">Requirements</button>
     <button id="open-documents" type="button" class="btn ghost" title="Browse every uploaded document, link to companies, delete">Documents</button>
     <button id="open-compliance" type="button" class="btn ghost" title="Show which companies are late on their disclosure">Compliance</button>
+    <button id="open-golden" type="button" class="btn ghost" title="Label a double-reviewed golden set for Phase 4 evaluation">Golden</button>
+    <button id="open-scorecard" type="button" class="btn ghost" title="Phase 4 KPIs: compare the pipeline against the golden labels">Scorecard</button>
     <div class="divider"></div>
     <label style="font-size:12px;color:var(--text-faint);display:flex;align-items:center;gap:8px;">
       Reviewer
@@ -939,6 +1129,55 @@
     <span id="documents-summary" class="drawer-hint" style="margin-left:auto;"></span>
   </div>
   <div id="documents-list" class="drawer-list"></div>
+</aside>
+<div id="golden-overlay" aria-hidden="true"></div>
+<aside id="golden-drawer" aria-hidden="true" aria-labelledby="golden-title">
+  <header class="drawer-header">
+    <div>
+      <h2 id="golden-title">Golden labels (two-reviewer set)</h2>
+      <div class="drawer-sub">
+        Role A and Role B each label the same candidates. The system is scored against the agreed labels in Phase 4.
+      </div>
+    </div>
+    <button id="close-golden" type="button" class="btn ghost compact">Close</button>
+  </header>
+  <div class="drawer-toolbar">
+    <input id="golden-reviewer" type="text" class="input" style="max-width: 220px;" placeholder="Your reviewer name" />
+    <select id="golden-filter-mode" class="input" style="max-width: 220px;">
+      <option value="">All candidates</option>
+      <option value="unlabeled">Not yet labeled</option>
+      <option value="single">One label only</option>
+      <option value="disagree">Disagreements only</option>
+      <option value="agree">Agreed</option>
+    </select>
+    <input id="golden-sample-count" type="number" class="input" min="1" max="200" value="30" style="max-width: 90px;" title="How many new candidates to sample" />
+    <button id="golden-sample-btn" type="button" class="btn ghost compact">Sample N more</button>
+    <span id="golden-summary" class="drawer-hint" style="margin-left:auto;"></span>
+  </div>
+  <div id="golden-list" class="drawer-list"></div>
+</aside>
+<div id="scorecard-overlay" aria-hidden="true"></div>
+<aside id="scorecard-drawer" aria-hidden="true" aria-labelledby="scorecard-title">
+  <header class="drawer-header">
+    <div class="title-block">
+      <h2 id="scorecard-title">Scorecard · Phase 4</h2>
+      <div class="drawer-sub">
+        Pipeline findings compared to the agreed golden labels. Targets from docs/work_plan.md.
+      </div>
+    </div>
+    <div class="header-actions">
+      <label class="hit5-toggle">
+        <input id="scorecard-hit5" type="checkbox" />
+        <span>Compute Hit@5</span>
+      </label>
+      <button id="scorecard-refresh" type="button" class="btn ghost compact">Refresh</button>
+      <button id="close-scorecard" type="button" class="btn ghost compact">Close</button>
+    </div>
+  </header>
+  <div class="drawer-toolbar">
+    <span id="scorecard-summary" class="drawer-hint"></span>
+  </div>
+  <div id="scorecard-metrics" class="drawer-list"></div>
 </aside>
 <div id="jobs-panel">
   <div class="jobs-header">
@@ -2298,6 +2537,452 @@ document.getElementById("documents-filter-mode").addEventListener("change", (e) 
   documentsState.filterMode = e.target.value;
   renderDocuments();
 });
+
+// --- Golden labels drawer --------------------------------------------------
+
+const goldenState = {
+  candidates: [],
+  summary: null,
+  reviewerName: localStorage.getItem("golden.reviewer") || "",
+  filterMode: "",
+  open: false,
+  loading: false,
+};
+
+async function openGolden() {
+  if (goldenState.open) return;
+  goldenState.open = true;
+  document.getElementById("golden-drawer").classList.add("show");
+  document.getElementById("golden-overlay").classList.add("show");
+  document.getElementById("golden-drawer").setAttribute("aria-hidden", "false");
+  const nameInput = document.getElementById("golden-reviewer");
+  nameInput.value = goldenState.reviewerName;
+  await loadGolden();
+}
+
+function closeGolden() {
+  if (!goldenState.open) return;
+  goldenState.open = false;
+  document.getElementById("golden-drawer").classList.remove("show");
+  document.getElementById("golden-overlay").classList.remove("show");
+  document.getElementById("golden-drawer").setAttribute("aria-hidden", "true");
+}
+
+async function loadGolden() {
+  if (goldenState.loading) return;
+  goldenState.loading = true;
+  const summaryEl = document.getElementById("golden-summary");
+  summaryEl.textContent = "loading...";
+  try {
+    const response = await fetch("/reviewer/golden");
+    if (!response.ok) {
+      summaryEl.textContent = `Load failed (${response.status})`;
+      return;
+    }
+    const payload = await response.json();
+    goldenState.candidates = payload.candidates || [];
+    goldenState.summary = payload.summary || null;
+    renderGoldenSummary();
+    renderGoldenList();
+  } finally {
+    goldenState.loading = false;
+  }
+}
+
+function renderGoldenSummary() {
+  const el = document.getElementById("golden-summary");
+  const s = goldenState.summary;
+  if (!s) { el.textContent = ""; return; }
+  const parts = [`${s.total} candidates`];
+  if (s.agree + s.disagree > 0) {
+    const pct = Math.round((s.agreement_rate || 0) * 100);
+    parts.push(`agreement ${pct}% (${s.agree} agree · ${s.disagree} disagree)`);
+  }
+  parts.push(`${s.single_reviewer} single · ${s.unlabeled} unlabeled`);
+  if (s.reviewers && s.reviewers.length) {
+    parts.push(`reviewers: ${s.reviewers.join(", ")}`);
+  }
+  el.textContent = parts.join(" · ");
+}
+
+function filteredGoldenCandidates() {
+  if (!goldenState.filterMode) return goldenState.candidates;
+  return goldenState.candidates.filter((cand) => {
+    const status = agreementOf(cand);
+    return status === goldenState.filterMode;
+  });
+}
+
+function agreementOf(cand) {
+  if (!cand.labels || cand.labels.length === 0) return "unlabeled";
+  if (cand.labels.length === 1) return "single";
+  const distinct = new Set(cand.labels.map((l) => l.label));
+  return distinct.size === 1 ? "agree" : "disagree";
+}
+
+function renderGoldenList() {
+  const list = document.getElementById("golden-list");
+  list.innerHTML = "";
+  const items = filteredGoldenCandidates();
+  if (!items.length) {
+    list.appendChild(create("div", { class: "empty" }, [
+      create("div", { class: "big" }, [
+        goldenState.candidates.length === 0
+          ? "No candidates yet. Click 'Sample N more' to seed from findings.json."
+          : "No candidates match the filter.",
+      ]),
+    ]));
+    return;
+  }
+  for (const cand of items) list.appendChild(renderGoldenRow(cand));
+}
+
+function renderGoldenRow(cand) {
+  const meta = create("div", { class: "meta" }, [
+    create("div", { class: "ids" }, [`${cand.requirement_id} · ${cand.document_id}`]),
+    create("div", {}, [
+      cand.system_status
+        ? create("span", { class: `chip ${chipClassFor(cand.system_status)}` }, [`system: ${cand.system_status}`])
+        : create("span", { class: "chip" }, ["system: n/a"]),
+    ]),
+    cand.system_reason
+      ? create("div", {}, [create("em", {}, [cand.system_reason])])
+      : null,
+    create("div", { class: `agreement ${agreementOf(cand)}` }, [agreementLabel(cand)]),
+  ].filter(Boolean));
+
+  const evidence = renderGoldenEvidenceBlock(cand);
+
+  const me = (goldenState.reviewerName || "").trim();
+  const myLabel = me ? cand.labels.find((l) => l.reviewer_name === me) : null;
+  const others = me
+    ? cand.labels.filter((l) => l.reviewer_name !== me)
+    : cand.labels;
+
+  const labelBlocks = others.map((label) =>
+    create("div", { class: "label-row" }, [
+      create("div", { class: "top" }, [
+        create("span", { class: "who" }, [label.reviewer_name]),
+        create("span", { class: `status chip ${chipClassFor(label.label)}` }, [label.label]),
+      ]),
+      label.reason ? create("div", { class: "reason" }, [label.reason]) : null,
+    ].filter(Boolean))
+  );
+
+  const myForm = me
+    ? renderGoldenMyForm(cand, myLabel)
+    : create("div", { class: "label-row" }, [
+        create("em", {}, ["Enter your reviewer name above to label candidates."]),
+      ]);
+
+  const labels = create("div", { class: "labels" }, [myForm, ...labelBlocks]);
+  return create("div", { class: "golden-row" }, [meta, evidence, labels]);
+}
+
+function renderGoldenMyForm(cand, myLabel) {
+  const select = document.createElement("select");
+  for (const value of ["Needs Review", "Met", "Not Met"]) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = value;
+    if (myLabel && myLabel.label === value) opt.selected = true;
+    select.appendChild(opt);
+  }
+  const reason = document.createElement("textarea");
+  reason.placeholder = "Why? (optional, kept with the label)";
+  reason.value = myLabel ? myLabel.reason : "";
+  const save = create("button", {
+    type: "button", class: "btn primary compact",
+    onclick: () => submitGoldenLabel(cand, select.value, reason.value),
+  }, [myLabel ? "Update" : "Submit"]);
+  const status = document.createElement("span");
+  status.className = "drawer-hint";
+  status.dataset.role = "status";
+
+  const row = create("div", { class: "label-row me" }, [
+    create("div", { class: "top" }, [
+      create("span", { class: "who" }, [`You (${(goldenState.reviewerName || "").trim()})`]),
+      myLabel
+        ? create("span", { class: `status chip ${chipClassFor(myLabel.label)}` }, [myLabel.label])
+        : create("span", { class: "status chip" }, ["not labeled"]),
+    ]),
+  ]);
+  const form = create("div", { class: "me-form" }, [
+    select, reason,
+    create("div", { class: "actions" }, [save, status]),
+  ]);
+  row.appendChild(form);
+  return row;
+}
+
+function renderGoldenEvidenceBlock(cand) {
+  const wrapper = create("div", { class: "evidence-block" }, []);
+  const sysBlock = cand.evidence_text
+    ? create("div", { class: "evidence" }, [
+        cand.evidence_page ? `page ${cand.evidence_page}\n\n` : "",
+        cand.evidence_text,
+      ])
+    : create("div", { class: "evidence empty" }, ["(no system evidence attached)"]);
+  wrapper.appendChild(create("div", { class: "evidence-section-label" }, ["System evidence"]));
+  wrapper.appendChild(sysBlock);
+  // Ground truth block
+  wrapper.appendChild(create("div", { class: "evidence-section-label gt" }, [
+    "Ground truth evidence",
+    cand.ground_truth_pinned_by
+      ? create("span", { class: "evidence-by" }, [` · pinned by ${cand.ground_truth_pinned_by}`])
+      : null,
+  ].filter(Boolean)));
+  const gtBlock = cand.ground_truth_page
+    ? create("div", { class: "evidence gt" }, [
+        `page ${cand.ground_truth_page}\n\n`,
+        cand.ground_truth_text || "(no quote entered)",
+      ])
+    : create("div", { class: "evidence empty gt" }, ["(not pinned yet)"]);
+  wrapper.appendChild(gtBlock);
+  // Pin form
+  wrapper.appendChild(renderGoldenEvidenceForm(cand));
+  return wrapper;
+}
+
+function renderGoldenEvidenceForm(cand) {
+  const pageInput = document.createElement("input");
+  pageInput.type = "number";
+  pageInput.min = "1";
+  pageInput.placeholder = "page #";
+  pageInput.className = "input compact";
+  pageInput.value = cand.ground_truth_page || "";
+  const textInput = document.createElement("textarea");
+  textInput.placeholder = "paste the correct passage (optional)";
+  textInput.value = cand.ground_truth_text || "";
+  textInput.className = "input compact";
+  const pinBtn = create("button", {
+    type: "button", class: "btn primary compact",
+    onclick: () => pinGoldenEvidence(cand, pageInput.value, textInput.value),
+  }, ["Pin"]);
+  const useSystemBtn = create("button", {
+    type: "button", class: "btn ghost compact",
+    title: "Copy the system evidence to ground truth",
+    disabled: !cand.evidence_page,
+    onclick: () => pinGoldenEvidence(cand, cand.evidence_page, cand.evidence_text || ""),
+  }, ["Use system"]);
+  const clearBtn = create("button", {
+    type: "button", class: "btn ghost compact",
+    title: "Clear the pinned evidence",
+    onclick: () => pinGoldenEvidence(cand, "", ""),
+  }, ["Clear"]);
+  return create("div", { class: "pin-form" }, [
+    pageInput,
+    textInput,
+    create("div", { class: "actions" }, [pinBtn, useSystemBtn, clearBtn]),
+  ]);
+}
+
+async function pinGoldenEvidence(cand, page, text) {
+  const me = (goldenState.reviewerName || "").trim();
+  const parsedPage = page === "" || page === null || page === undefined
+    ? null
+    : parseInt(page, 10);
+  if (parsedPage !== null && (Number.isNaN(parsedPage) || parsedPage < 1)) {
+    toast("Page must be a positive integer.");
+    return;
+  }
+  const payload = {
+    document_id: cand.document_id,
+    requirement_id: cand.requirement_id,
+    page: parsedPage,
+    text: text || "",
+    pinned_by: me,
+  };
+  try {
+    const response = await fetch("/reviewer/golden/evidence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      toast(`Pin failed: ${body.detail || response.status}`);
+      return;
+    }
+    await loadGolden();
+  } catch (err) {
+    toast(`Pin error: ${err}`);
+  }
+}
+
+async function submitGoldenLabel(cand, label, reason) {
+  const me = (goldenState.reviewerName || "").trim();
+  if (!me) { toast("Enter your reviewer name first."); return; }
+  const payload = {
+    document_id: cand.document_id,
+    requirement_id: cand.requirement_id,
+    reviewer_name: me,
+    label,
+    reason,
+  };
+  try {
+    const response = await fetch("/reviewer/golden/label", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      toast(`Save failed: ${body.detail || response.status}`);
+      return;
+    }
+    await loadGolden();
+  } catch (err) {
+    toast(`Save error: ${err}`);
+  }
+}
+
+async function sampleGoldenCandidates() {
+  const count = parseInt(document.getElementById("golden-sample-count").value, 10) || 30;
+  const btn = document.getElementById("golden-sample-btn");
+  btn.disabled = true;
+  btn.textContent = "sampling...";
+  try {
+    const response = await fetch("/reviewer/golden/sample", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count, seed: 0 }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      toast(`Sample failed: ${body.detail || response.status}`);
+      return;
+    }
+    const result = await response.json();
+    toast(`Sampled ${result.added} new candidates (${result.skipped_duplicates} already present).`);
+    await loadGolden();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sample N more";
+  }
+}
+
+function chipClassFor(status) {
+  if (status === "Met") return "met";
+  if (status === "Not Met") return "notmet";
+  return "review";
+}
+
+function agreementLabel(cand) {
+  const kind = agreementOf(cand);
+  if (kind === "agree") return "both reviewers agree";
+  if (kind === "disagree") return "reviewers disagree";
+  if (kind === "single") return "needs a second reviewer";
+  return "no labels yet";
+}
+
+document.getElementById("open-golden").addEventListener("click", openGolden);
+document.getElementById("close-golden").addEventListener("click", closeGolden);
+document.getElementById("golden-overlay").addEventListener("click", closeGolden);
+document.getElementById("golden-sample-btn").addEventListener("click", sampleGoldenCandidates);
+document.getElementById("golden-filter-mode").addEventListener("change", (e) => {
+  goldenState.filterMode = e.target.value;
+  renderGoldenList();
+});
+document.getElementById("golden-reviewer").addEventListener("input", (e) => {
+  goldenState.reviewerName = e.target.value;
+  localStorage.setItem("golden.reviewer", e.target.value);
+  renderGoldenList();
+});
+
+// --- Scorecard drawer ------------------------------------------------------
+
+const scorecardState = { open: false, loading: false, data: null };
+
+async function openScorecard() {
+  if (scorecardState.open) return;
+  scorecardState.open = true;
+  document.getElementById("scorecard-drawer").classList.add("show");
+  document.getElementById("scorecard-overlay").classList.add("show");
+  document.getElementById("scorecard-drawer").setAttribute("aria-hidden", "false");
+  await loadScorecard();
+}
+
+function closeScorecard() {
+  if (!scorecardState.open) return;
+  scorecardState.open = false;
+  document.getElementById("scorecard-drawer").classList.remove("show");
+  document.getElementById("scorecard-overlay").classList.remove("show");
+  document.getElementById("scorecard-drawer").setAttribute("aria-hidden", "true");
+}
+
+async function loadScorecard() {
+  if (scorecardState.loading) return;
+  scorecardState.loading = true;
+  const summary = document.getElementById("scorecard-summary");
+  const list = document.getElementById("scorecard-metrics");
+  const withHit5 = document.getElementById("scorecard-hit5").checked;
+  summary.textContent = withHit5 ? "computing scorecard + Hit@5..." : "computing scorecard...";
+  list.innerHTML = "";
+  try {
+    const response = await fetch(`/reviewer/scorecard?include_hit_at_5=${withHit5}`);
+    if (!response.ok) {
+      summary.textContent = `Load failed (${response.status})`;
+      return;
+    }
+    const payload = await response.json();
+    scorecardState.data = payload;
+    renderScorecard(payload);
+  } catch (err) {
+    summary.textContent = `Load error: ${err}`;
+  } finally {
+    scorecardState.loading = false;
+  }
+}
+
+function renderScorecard(data) {
+  const summary = document.getElementById("scorecard-summary");
+  summary.textContent =
+    `${data.total_golden} golden candidates · ` +
+    `${data.scored_golden} scored (both reviewers agree) · ` +
+    `${data.disagreement_count} disagreements · ` +
+    `${data.unlabeled_count} unlabeled · ` +
+    `${data.with_ground_truth_evidence} with pinned evidence`;
+  const list = document.getElementById("scorecard-metrics");
+  list.innerHTML = "";
+  for (const metric of data.metrics || []) {
+    list.appendChild(renderScorecardMetric(metric));
+  }
+}
+
+function renderScorecardMetric(metric) {
+  const nameCol = create("div", {}, [
+    create("div", { class: "name" }, [metric.name]),
+    create("div", { class: "description" }, [metric.description]),
+    metric.notes ? create("div", { class: "notes" }, [metric.notes]) : null,
+  ].filter(Boolean));
+  const valueText = metric.value === null || metric.value === undefined
+    ? "n/a"
+    : formatMetricValue(metric.value);
+  const valueEl = create("div", {
+    class: `value ${metric.value === null || metric.value === undefined ? "na" : ""}`,
+  }, [metric.sample_size ? `${valueText} (n=${metric.sample_size})` : valueText]);
+  const targetEl = create("div", { class: "target" }, [
+    `${metric.direction === "higher_is_better" ? "≥" : "≤"} ${formatMetricValue(metric.target_value)}`,
+  ]);
+  let flagClass = "na";
+  let flagText = "n/a";
+  if (metric.meets_target === true) { flagClass = "pass"; flagText = "pass"; }
+  else if (metric.meets_target === false) { flagClass = "fail"; flagText = "below"; }
+  const flagEl = create("div", { class: `flag ${flagClass}` }, [flagText]);
+  return create("div", { class: "scorecard-metric" }, [nameCol, valueEl, targetEl, flagEl]);
+}
+
+function formatMetricValue(value) {
+  if (value === null || value === undefined) return "n/a";
+  return `${Math.round(value * 1000) / 10}%`;
+}
+
+document.getElementById("open-scorecard").addEventListener("click", openScorecard);
+document.getElementById("close-scorecard").addEventListener("click", closeScorecard);
+document.getElementById("scorecard-overlay").addEventListener("click", closeScorecard);
+document.getElementById("scorecard-refresh").addEventListener("click", loadScorecard);
+document.getElementById("scorecard-hit5").addEventListener("change", loadScorecard);
 
 document.getElementById("compliance-period").addEventListener("change", (e) => {
   companyState.currentPeriodId = e.target.value;

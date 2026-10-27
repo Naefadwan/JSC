@@ -413,6 +413,7 @@ def _run_job(
                 bm25_index_path=settings.bm25_index_path,
                 dense_index_path=settings.dense_index_path,
                 update_dense=settings.update_dense_on_upload,
+                use_dense_at_review=settings.use_dense_at_review,
                 reranker=reranker,
                 cer_measurements_path=settings.cer_measurements_path,
                 chunks_with_ocr_dir=settings.chunks_with_ocr_dir,

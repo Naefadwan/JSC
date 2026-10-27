@@ -131,8 +131,11 @@ def test_heading_from_ocr_stays_review_when_cer_too_high() -> None:
 
 
 def test_language_requirement_shows_a_passage_and_stays_needs_review() -> None:
+    # DIS-999 is not covered by any deterministic rule, so review_document
+    # falls through to the retrieval-only path (no local model is loaded)
+    # and emits a Needs-Review recommendation with the top passage attached.
     requirement = Requirement(
-        requirement_id="DIS-026",
+        requirement_id="DIS-999",
         section="بند 10",
         text_ar="وصف للمخاطر التي تتعرض لها الشركة",
         text_en="Description of the risks to which the company is exposed.",

@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     bm25_index_path: Path = Path("indexes/chunk_bm25.json")
     dense_index_path: Path = Path("indexes/chunk_dense.faiss")
     update_dense_on_upload: bool = True
+    # When True, the per-upload review loop also queries the dense FAISS index
+    # alongside BM25 (reciprocal rank fusion). Default stays False so an older
+    # install without the retrieval extra keeps working unchanged.
+    use_dense_at_review: bool = False
+    # On-disk location for the golden-label store (two-reviewer agreement set).
+    golden_labels_path: Path = Path("data/golden/labels.json")
     max_upload_mb: int = Field(default=100, ge=1, le=1024)
     cer_measurements_path: Path = Path("Data/reports/ocr_rerun/cer_measurements.json")
     chunks_with_ocr_dir: Path = Path("Data/reports/chunks_with_ocr")

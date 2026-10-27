@@ -3,8 +3,10 @@
 from fastapi import FastAPI
 
 from jsc_review.api.routes.companies import router as companies_router
+from jsc_review.api.routes.golden import router as golden_router
 from jsc_review.api.routes.health import router as health_router
 from jsc_review.api.routes.reviewer import router as reviewer_router
+from jsc_review.api.routes.scorecard import router as scorecard_router
 from jsc_review.api.routes.uploads import router as uploads_router
 from jsc_review.core.logging import configure_logging
 from jsc_review.core.settings import get_settings
@@ -25,6 +27,8 @@ def create_app() -> FastAPI:
     application.include_router(reviewer_router)
     application.include_router(uploads_router)
     application.include_router(companies_router)
+    application.include_router(golden_router)
+    application.include_router(scorecard_router)
     return application
 
 

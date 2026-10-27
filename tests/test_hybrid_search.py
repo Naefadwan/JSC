@@ -107,7 +107,10 @@ def test_cue_terms_for_customer_requirement_pulls_customer_cues() -> None:
 
 
 def test_cue_terms_for_unknown_requirement_is_empty() -> None:
-    requirement = _requirement("GOV-001", "سياسة إدارة المخاطر", "risk management policy")
+    # DIS-999 is not registered under any deterministic or cue rule, so the
+    # universal cue vocabulary should be empty. Picking a reserved id keeps
+    # the test independent of future HEADING_VARIANTS additions.
+    requirement = _requirement("DIS-999", "متطلب غير معرّف", "unregistered requirement")
 
     assert cue_terms_for(requirement) == ()
 

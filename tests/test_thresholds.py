@@ -143,7 +143,11 @@ def test_measurement_for_a_different_page_does_not_promote_ocr() -> None:
     assert finding.result.status == "Needs Review"
 
 
-def test_customer_dependence_at_or_above_ten_percent_is_met() -> None:
+def test_customer_dependence_header_is_met() -> None:
+    # DIS-017 is now heading-based. Any recognizable customer- or supplier-
+    # concentration disclosure counts as Met regardless of the exact
+    # percentage, which rescues the common "no customers above the 10%
+    # threshold" wording that the old percentage-only path missed.
     page = "درجة الاعتماد على موردين محددين تبلغ 12% من إجمالي المشتريات."
 
     finding = review_document("report", _requirement("DIS-017"), {6: page}, {})
@@ -151,11 +155,16 @@ def test_customer_dependence_at_or_above_ten_percent_is_met() -> None:
     assert finding.result.status == "Met"
     assert finding.result.evidence is not None
     assert finding.result.evidence.verified is True
-    assert "12%" in finding.result.reason
+    # The reason now cites the matched heading variant rather than the
+    # percentage; the evidence excerpt still shows the surrounding text.
+    assert "درجة الاعتماد على موردين" in finding.result.reason
 
 
-def test_customer_dependence_below_ten_percent_stays_needs_review() -> None:
-    page = "الاعتماد على الموردين يبلغ 4% من المشتريات."
+def test_customer_dependence_without_disclosure_phrase_stays_needs_review() -> None:
+    # A page that mentions suppliers in passing (without the disclosure
+    # heading or the "no major concentration" phrasing) still falls to
+    # the human reviewer.
+    page = "تعاونت الشركة مع عدة موردين خلال العام الماضي بشكل عام."
 
     finding = review_document("report", _requirement("DIS-017"), {6: page}, {})
 

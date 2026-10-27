@@ -30,6 +30,7 @@ from jsc_review.retrieval.bm25 import (
     build_index,
     save_indexed_chunks,
 )
+from jsc_review.retrieval.dense import DenseIndex
 from jsc_review.retrieval.reranker import CrossEncoder
 from jsc_review.review.findings import Requirement, judge_requirement
 
@@ -153,6 +154,7 @@ def process_uploaded_pdf(
     bm25_index_path: Path | None = None,
     dense_index_path: Path | None = None,
     update_dense: bool = True,
+    use_dense_at_review: bool = False,
     reranker: CrossEncoder | None = None,
     cer_measurements_path: Path | None = None,
     chunks_with_ocr_dir: Path | None = None,
@@ -213,6 +215,16 @@ def process_uploaded_pdf(
     if chunks_with_ocr_dir is not None and index_chunks:
         save_indexed_chunks(index_chunks, chunks_with_ocr_dir, document_id)
 
+    # Optional dense retrieval at review time. Load once per upload so the
+    # encoder is not reinstantiated per requirement. Any failure degrades to
+    # BM25-only review; the loop never raises on retrieval setup.
+    dense_for_review = _maybe_load_dense_for_review(
+        use_dense_at_review=use_dense_at_review,
+        dense_index_path=dense_index_path,
+        document_id=document_id,
+        progress=progress,
+    )
+
     _check_cancel(is_canceled)
     _notify(progress, "judging", f"حكم {len(requirements)} متطلب")
     _tick(stage_progress, "judging", 0, len(requirements))
@@ -225,6 +237,7 @@ def process_uploaded_pdf(
             pages=pages,
             ocr_pages=ocr_pages,
             index=index,
+            dense=dense_for_review,
             reranker=reranker,
             cer_store=cer_store,
         )
@@ -423,6 +436,7 @@ def _review_one(
     pages: dict[int, str],
     ocr_pages: dict[int, str],
     index: Bm25Index | None,
+    dense: DenseIndex | None = None,
     reranker: CrossEncoder | None = None,
     cer_store: MeasurementStore | None = None,
 ) -> dict[str, object]:
@@ -434,11 +448,59 @@ def _review_one(
         pages,
         ocr_pages,
         index,
-        dense=None,
+        dense=dense,
         reranker=reranker,
         cer_store=cer_store,
     )
     return {"document_id": document_id, "result": result.model_dump()}
+
+
+def _maybe_load_dense_for_review(
+    *,
+    use_dense_at_review: bool,
+    dense_index_path: Path | None,
+    document_id: str,
+    progress: Progress | None,
+) -> DenseIndex | None:
+    """Load the dense FAISS index + encoder for review-time hybrid search.
+
+    Returns None when dense retrieval is disabled, when the index file is
+    missing, when the encoder cannot load, or when the index has no chunks
+    for this document (BM25-only is strictly cheaper in that case). Any
+    exception degrades gracefully; the review loop keeps running on BM25.
+    """
+
+    if not use_dense_at_review:
+        return None
+    if dense_index_path is None or not dense_index_path.exists():
+        _notify(
+            progress,
+            "indexing",
+            "تخطي البحث الكثيف: ملف الفهرس غير موجود.",
+        )
+        return None
+    try:
+        global_dense = dense_module.load_index(dense_index_path)
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
+        # FAISS raises RuntimeError on a corrupt file. Any load failure
+        # degrades to BM25-only review; we never let it break the loop.
+        _notify(progress, "indexing", f"تعذّر تحميل الفهرس الكثيف: {exc}")
+        return None
+    if not any(chunk.document_id == document_id for chunk in global_dense.chunks):
+        # The current upload's chunks are not in the dense index yet, so
+        # dense search for this document would return nothing useful.
+        return None
+    try:
+        from jsc_review.retrieval.embedding import (
+            SentenceTransformerEncoder,
+            embedding_settings,
+        )
+
+        encoder = SentenceTransformerEncoder(embedding_settings())
+    except Exception as exc:  # noqa: BLE001
+        _notify(progress, "indexing", f"تعذّر تحميل مُرمّز BGE-M3: {exc}")
+        return None
+    return global_dense.with_encoder(encoder)
 
 
 def _append_finding(findings_path: Path, record: dict[str, object]) -> None:

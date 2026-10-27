@@ -12,7 +12,7 @@ from typing import Any
 
 from jsc_review.core.models import Evidence, ReviewResult
 from jsc_review.documents.cer_measurement import MeasurementStore
-from jsc_review.documents.normalization import quote_matches_page
+from jsc_review.documents.normalization import normalize_arabic, quote_matches_page
 from jsc_review.retrieval.bm25 import Bm25Index
 from jsc_review.retrieval.dense import DenseIndex
 from jsc_review.retrieval.reranker import CrossEncoder
@@ -28,24 +28,332 @@ from jsc_review.review.thresholds import match_customer_disclosure, match_owner_
 JudgeCallable = Callable[..., Any]
 
 _WHITESPACE = re.compile(r"\s+")
+
+# Arabic prefix letters that commonly fuse to the start of a content word
+# (lam, ba, kaf, fa, waw, sin, alef). Allowing 0-2 of them before each anchor
+# lets us match ``للميزانية`` / ``وبيان`` / ``بالميزانية`` without listing
+# every surface form in HEADING_VARIANTS.
+_ARABIC_PREFIX_CHARS = "\u0644\u0628\u0643\u0641\u0648\u0633\u0627"
+_ARABIC_RANGE = r"\u0600-\u06FF"
+
+
+def _is_arabic(text: str) -> bool:
+    """True when the string contains any Arabic script character."""
+
+    return any("\u0600" <= ch <= "\u06FF" for ch in text)
+
+
+def _anchor_pattern(anchor: str) -> re.Pattern[str]:
+    """Build a case-folded regex that tolerates Arabic affix letters.
+
+    Arabic anchors get a ``[ل ب ك ف و س ا]{0,2}`` prefix allowance and a
+    non-Arabic-letter guard on both sides so the match is a word boundary
+    even when the anchor fuses with surrounding words. Non-Arabic anchors
+    use a plain word-boundary form that works for mixed Latin/Arabic pages.
+
+    Special case: when the stem starts with ``ال`` (definite article), the
+    leading ``ا`` orthographically drops after a ``لـ`` or ``بـ`` prefix,
+    so ``لـ + الميزانية`` is written ``للميزانية`` (one alef, two lams).
+    The pattern therefore also matches the stem with the article dropped
+    when preceded by one of the valid prefix letters.
+    """
+
+    folded = anchor.casefold()
+    escaped = re.escape(folded)
+    full_form = rf"[{_ARABIC_PREFIX_CHARS}]{{0,2}}{escaped}"
+    stem_form = ""
+    # ``ال`` is alef (U+0627) followed by lam (U+0644).
+    if _is_arabic(anchor) and anchor.startswith("\u0627\u0644"):
+        stem_without_article = anchor[1:]  # drop the leading alef
+        stem_escaped = re.escape(stem_without_article.casefold())
+        # At least one prefix letter is required when the article is dropped,
+        # otherwise we would match bare "لميزانية" which is not Arabic.
+        stem_form = rf"|[{_ARABIC_PREFIX_CHARS}]{{1,2}}{stem_escaped}"
+    if _is_arabic(anchor):
+        pattern = (
+            rf"(?:(?<![{_ARABIC_RANGE}])|^)"
+            rf"(?:{full_form}{stem_form})"
+            rf"(?:(?![{_ARABIC_RANGE}])|$)"
+        )
+    else:
+        pattern = rf"\b{escaped}\b"
+    return re.compile(pattern, flags=re.IGNORECASE | re.MULTILINE)
+
+
+# -------------------------------------------------- deterministic rules ---
+#
+# Each requirement in HEADING_VARIANTS is Met when any of its anchor phrases
+# appears on an embedded page (and, when CER measurements allow, on an OCR
+# page). Entries live here so the UI register can flip a row to
+# ``evaluation_method=deterministic`` and the review loop picks it up without
+# a code change in production code paths.
 HEADING_VARIANTS: dict[str, tuple[str, ...]] = {
     "DIS-062": (
         "statement of financial position",
+        "consolidated statement of financial position",
         "balance sheet",
         "قائمة المركز المالي",
+        "قائمة المركز المالي الموحدة",
         "بيان المركز المالي",
         "الميزانية العمومية",
         "الميزانية العامة",
     ),
     "DIS-064": (
         "statement of cash flows",
+        "consolidated statement of cash flows",
         "cash flow statement",
         "cash flows",
         "قائمة التدفقات النقدية",
+        "قائمة التدفقات النقدية الموحدة",
         "قائمة التدفق النقدي",
         "بيان التدفقات النقدية",
+        "بيان التدفق النقدي",
+    ),
+    # GOV-002: adoption of a professional code of conduct for the board
+    # and executives. The regulatory text asks the report to show the code
+    # has been adopted and is kept current. Deterministic coverage is any
+    # of the recognized headings for the code or an ethics charter.
+    "GOV-002": (
+        "مدونة السلوك المهني",
+        "مدونة السلوك",
+        "مدونة قواعد السلوك",
+        "ميثاق الأخلاقيات",
+        "ميثاق السلوك المهني",
+        "ميثاق سلوك",
+        "ميثاق أخلاقيات العمل",
+        "قواعد السلوك المهني",
+        "code of conduct",
+        "code of ethics",
+        "code of professional conduct",
+        "professional conduct code",
+        "business ethics",
+    ),
+    # Phase C: move GOV-006 (governance chapter) from EARLY_PAGE_RULES to
+    # a presence-only check — diagnostic shows the governance chapter in
+    # live reports starts around page 70+, so a page restriction is wrong.
+    "GOV-006": (
+        "قواعد حوكمة الشركات",
+        "دليل قواعد حوكمة الشركات",
+        "حوكمة الشركات المساهمة",
+        "تعليمات حوكمة الشركات",
+        "نظام الحوكمة",
+        "إطار حوكمة الشركة",
+        "corporate governance rules",
+        "corporate governance code",
+        "corporate governance framework",
+    ),
+    # Phase B strong conversions.
+    "GOV-007": (
+        "board of directors",
+        "members of the board",
+        "board composition",
+        "chairman and members of the board",
+        "أعضاء مجلس الإدارة",
+        "تشكيلة مجلس الإدارة",
+        "تشكيل مجلس الإدارة",
+        "تركيبة مجلس الإدارة",
+        "أعضاء المجلس الحاليين",
+        "رئيس وأعضاء مجلس الإدارة",
+        "رئيس مجلس الإدارة ونائب رئيس مجلس الإدارة",
+        "رئيس مجلس إدارة الشركة",
+        "مجلس إدارة الشركة",
+    ),
+    "GOV-011": (
+        "governance liaison",
+        "governance liaison officer",
+        "corporate governance officer",
+        "ضابط ارتباط الحوكمة",
+        "ضابط ارتباط حوكمة",
+        "مسؤول ارتباط الحوكمة",
+    ),
+    "GOV-015": (
+        "committee meetings",
+        "number of committee meetings",
+        "meetings of the committees",
+        "اجتماعات اللجان",
+        "عدد اجتماعات اللجان",
+        "اجتماعات لجنة التدقيق",
+        "اجتماعات لجنة الترشيحات",
+        "اجتماعات لجنة المكافآت",
+        "اجتماعات لجنة الحوكمة",
+    ),
+    "DIS-039": (
+        "securities owned by board members",
+        "shares owned by board members",
+        "directors' shareholdings",
+        "أسهم أعضاء مجلس الإدارة",
+        "ملكية أعضاء مجلس الإدارة للأوراق المالية",
+        "ملكية أعضاء المجلس للأوراق المالية",
+        "ملكية أعضاء مجلس الإدارة من الأوراق المالية",
+        # Phrasings observed in live reports (diagnostic 2026-10-27):
+        "عدد الأوراق المالية المملوكة",
+        "الأوراق المالية المملوكة من قبل أعضاء مجلس الإدارة",
+        "عدد الأسهم التي يمتلكها",
+        "عدد الأسهم التي يمتلكها رئيس وأعضاء مجلس",
+        "األوراق المالية المملوكة",
+        "األسهم التي يمتلكها",
+    ),
+    "DIS-058": (
+        "going concern",
+        "no material matters",
+        "استمرارية الشركة",
+        "استمرارية البنك",
+        "استمرار الشركة",
+        "لا توجد أي أمور جوهرية",
+        "عدم وجود أمور جوهرية",
+        "لا توجد أية أمور جوهرية",
+        "أمور جوهرية قد تؤثر على استمرارية الشركة",
+        # Live-report phrasings that short-stop before "تؤثر" so the trailing
+        # letter boundary still matches when the extraction glues the next
+        # word (e.g. "تؤثرعلى") against it.
+        "بعدم وجود أي أمور جوهرية",
+        "بعدم وجود أية أمور جوهرية",
+        "أي أمور جوهرية قد تؤثر",
+        "أية أمور جوهرية قد تؤثر",
+    ),
+    # Phase B presence-only conversions.
+    "GOV-001": (
+        "risk management policy",
+        "policy for risk management",
+        "سياسة إدارة المخاطر",
+        "سياسة إدارة مخاطر",
+        "اعتماد سياسة إدارة المخاطر",
+    ),
+    "DIS-001": (
+        "principal activities",
+        "main activities",
+        "nature of business",
+        "company activities",
+        "أنشطة الشركة الرئيسية",
+        "الأنشطة الرئيسية للشركة",
+        "النشاطات الرئيسية",
+        "طبيعة أعمال الشركة",
+        "نشاط الشركة",
+        "أعمال الشركة",
+        "نبذة عن الشركة",
+        "رؤية الشركة ومهمتها",
+        "رؤية الشركة",
+    ),
+    "DIS-026": (
+        "principal risks",
+        "risk factors",
+        "risks facing the company",
+        "risk management",
+        "المخاطر التي تواجه الشركة",
+        "المخاطر التي تتعرض لها الشركة",
+        "وصف المخاطر",
+        "أنواع المخاطر",
+        "إدارة المخاطر",
+        "لجنة إدارة المخاطر",
+        "سياسة إدارة المخاطر",
+        "مخاطر الشركة",
+    ),
+    "DIS-034": (
+        "financial position analysis",
+        "operating results",
+        "management discussion and analysis",
+        "analysis of financial position",
+        "تحليل المركز المالي",
+        "تحليل المركز المالي ونتائج الأعمال",
+        "نتائج أعمال الشركة",
+        "تحليل نتائج الأعمال",
+        "تحليل نتائج أعمال الشركة",
+        "نتائج أعمال الشركة ومركزها المالي",
+        "تحليل نتائج أعمال الشركة ومركزها المالي",
+    ),
+    "DIS-056": (
+        "related party transactions",
+        "transactions with related parties",
+        "related parties",
+        "related party",
+        "عقود مع الأطراف ذات العلاقة",
+        "معاملات الأطراف ذات العلاقة",
+        "العقود والمشاريع والارتباطات",
+        "صفقات الأطراف ذات العلاقة",
+        "الأطراف ذات العلاقة",
+        "ارتباطات الشركة مع رئيس وأعضاء مجلس",
+        # Live-report phrasings observed in financial-note sections:
+        "الجهات ذات علاقة",
+        "الجهات ذات العلاقة",
+        "جهات ذات علاقة",
+        "جهات ذات العلاقة",
+        "الأرصدة مع الجهات ذات علاقة",
+        "ملخص الأرصدة مع الجهات",
+        "المعاملات مع الأطراف ذات العلاقة",
+    ),
+    # DIS-017 (customer / supplier concentration disclosure). The threshold
+    # rule in review/thresholds.py requires an explicit percentage figure,
+    # which fails on the common "no customers or suppliers above the 10%
+    # threshold" disclosure — that is still a valid disclosure and should
+    # count as Met. The heading-presence anchors catch both the "yes, we
+    # have X major customers" phrasing and the "no major concentration"
+    # phrasing. The dispatch runs HEADING_VARIANTS before THRESHOLD_RULES,
+    # so DIS-017 is handled here now.
+    "DIS-017": (
+        "درجة الاعتماد على موردين",
+        "درجة الاعتماد على عملاء",
+        "موردين محددين أو عملاء رئيسيين",
+        "موردين رئيسيين أو عملاء",
+        "لا يوجد موردين محددين أو عملاء",
+        "لا يوجد موردين محددين",
+        "لا يوجد عملاء رئيسيين",
+        "اعتماد الشركة على موردين",
+        "اعتماد الشركة على عملاء",
+        "تركز العملاء",
+        "تركز الموردين",
+        "customer concentration",
+        "supplier concentration",
+        "major customers",
+        "major suppliers",
+        "dependence on customers",
+        "dependence on suppliers",
+    ),
+    # DIS-067 (auditor's report present): the regulatory requirement is that
+    # an auditor's report accompanies the filing. Earlier multi-anchor logic
+    # also required the report to cite the disclosure instructions, which
+    # real auditor's reports do not: they cite auditing standards (ISA).
+    # Presence of the auditor's report heading is the sound deterministic
+    # test; its contents are reviewed elsewhere.
+    "DIS-067": (
+        "تقرير مدققي الحسابات",
+        "تقرير مدقق الحسابات",
+        "تقرير مدققي الحسابات المستقلين",
+        "تقرير حول تدقيق القوائم المالية",
+        "independent auditor's report",
+        "independent auditors' report",
+        "independent auditor",
+        "report of the independent auditor",
     ),
 }
+
+# Multi-anchor rule: Met requires every listed anchor to appear on the
+# same page. Reserved for genuinely conjunctive requirements where any
+# single anchor would be too weak to prove compliance.
+MULTI_ANCHOR_RULES: dict[str, tuple[tuple[str, ...], ...]] = {}
+
+# Early-pages rule: Met requires the anchor within the first N pages of the
+# report. Reserved for truly front-matter requirements. GOV-006 was moved
+# to HEADING_VARIANTS because the governance chapter in live reports sits
+# past page 70 — a page restriction was the wrong constraint.
+EARLY_PAGE_RULES: dict[str, tuple[tuple[str, ...], int]] = {}
+
+# Table-structure rule: Met requires the anchor plus a nearby tabular
+# structure (DIS-004 asks for employees per activity and location, which
+# almost always appears as a table rather than prose).
+TABLE_STRUCTURE_RULES: dict[str, tuple[tuple[str, ...], int, int]] = {
+    "DIS-004": (
+        (
+            "عدد الموظفين",
+            "number of employees",
+            "عدد موظفي الشركة",
+            "staff count",
+        ),
+        2,   # minimum columns (counted as runs of 2+ spaces or tab-like gaps)
+        3,   # minimum rows that look tabular
+    ),
+}
+
+
 THRESHOLD_RULES = frozenset({"DIS-010", "DIS-011", "DIS-017"})
 
 
@@ -105,8 +413,34 @@ def review_document(
 
     if requirement.requirement_id in HEADING_VARIANTS:
         result = _review_heading(document_id, requirement, pages, ocr_pages, cer_store=cer_store)
+        # Fallthrough: when a requirement sits in both HEADING_VARIANTS and
+        # THRESHOLD_RULES (e.g. DIS-017), the heading check catches the
+        # "no major concentration" disclosure and the threshold check
+        # catches the "customer X at 12% of sales" disclosure. If the
+        # heading pass does not reach Met, try the threshold path too.
+        if (
+            result.status != "Met"
+            and requirement.requirement_id in THRESHOLD_RULES
+        ):
+            threshold_result = _review_threshold(
+                document_id, requirement, pages, ocr_pages, cer_store=cer_store
+            )
+            if threshold_result.status == "Met":
+                result = threshold_result
     elif requirement.requirement_id in THRESHOLD_RULES:
         result = _review_threshold(document_id, requirement, pages, ocr_pages, cer_store=cer_store)
+    elif requirement.requirement_id in MULTI_ANCHOR_RULES:
+        result = _review_multi_anchor(
+            document_id, requirement, pages, ocr_pages, cer_store=cer_store
+        )
+    elif requirement.requirement_id in EARLY_PAGE_RULES:
+        result = _review_early_page(
+            document_id, requirement, pages, ocr_pages, cer_store=cer_store
+        )
+    elif requirement.requirement_id in TABLE_STRUCTURE_RULES:
+        result = _review_table_structure(
+            document_id, requirement, pages, ocr_pages, cer_store=cer_store
+        )
     else:
         result = _review_retrieved(
             document_id,
@@ -237,6 +571,257 @@ def _review_heading(
         reason=(
             "لم يُعثر على عنوان قائمة معترف به. تحتاج الصياغة غير المألوفة إلى "
             "مراجعة بشرية بدلاً من اعتبارها عدم استيفاء مؤكد."
+        ),
+        evidence=None,
+        confidence=0.3,
+        evaluation_method="deterministic",
+    )
+
+
+def _review_multi_anchor(
+    document_id: str,
+    requirement: Requirement,
+    pages: dict[int, str],
+    ocr_pages: dict[int, str],
+    *,
+    cer_store: MeasurementStore | None = None,
+) -> ReviewResult:
+    """Met when every anchor group hits the same page (DIS-067 style)."""
+
+    anchor_groups = MULTI_ANCHOR_RULES[requirement.requirement_id]
+    found = _find_variants_on_same_page(pages, anchor_groups)
+    if found is not None:
+        page_number, excerpt = found
+        return _result(
+            requirement,
+            status="Met",
+            reason=(
+                "تم التحقق من حضور كل العبارات المطلوبة على الصفحة ذاتها، "
+                f"وهي الصفحة رقم {page_number}."
+            ),
+            evidence=_evidence(
+                document_id,
+                page_number,
+                requirement.section,
+                excerpt,
+                verified=True,
+            ),
+            confidence=0.9,
+            evaluation_method="deterministic",
+        )
+    ocr_found = _find_variants_on_same_page(ocr_pages, anchor_groups)
+    if ocr_found is not None:
+        page_number, excerpt = ocr_found
+        if cer_store is not None and cer_store.allows_verified_evidence(document_id, page_number):
+            cer = cer_store.cer_for(document_id, page_number) or 0.0
+            return _result(
+                requirement,
+                status="Met",
+                reason=(
+                    "تم التحقق من حضور كل العبارات المطلوبة على الصفحة ذاتها من نص OCR "
+                    f"(الصفحة {page_number}). معدل خطأ OCR المقاس {cer * 100:.2f}٪ "
+                    "وهو ضمن الحد المسموح به."
+                ),
+                evidence=_evidence(
+                    document_id,
+                    page_number,
+                    requirement.section,
+                    excerpt,
+                    verified=True,
+                    chunk_suffix="ocr",
+                ),
+                confidence=0.85,
+                evaluation_method="deterministic",
+            )
+        return _result(
+            requirement,
+            status="Needs Review",
+            reason=(
+                "جميع العبارات المطلوبة ظهرت على نفس صفحة OCR، ولكن معدل خطأ OCR "
+                "لا يسمح باعتماده دليلاً حتى الآن."
+            ),
+            evidence=_evidence(
+                document_id,
+                page_number,
+                requirement.section,
+                excerpt,
+                verified=False,
+                chunk_suffix="ocr",
+            ),
+            confidence=0.4,
+            evaluation_method="deterministic",
+        )
+    return _result(
+        requirement,
+        status="Needs Review",
+        reason=(
+            "لم تتجمع جميع العبارات المطلوبة على صفحة واحدة. "
+            "تحتاج الصياغة إلى مراجعة بشرية."
+        ),
+        evidence=None,
+        confidence=0.3,
+        evaluation_method="deterministic",
+    )
+
+
+def _review_early_page(
+    document_id: str,
+    requirement: Requirement,
+    pages: dict[int, str],
+    ocr_pages: dict[int, str],
+    *,
+    cer_store: MeasurementStore | None = None,
+) -> ReviewResult:
+    """Met when an anchor is found within the first N embedded pages."""
+
+    variants, max_page = EARLY_PAGE_RULES[requirement.requirement_id]
+    found = _find_variant_within(pages, variants, max_page=max_page)
+    if found is not None:
+        page_number, variant, excerpt = found
+        return _result(
+            requirement,
+            status="Met",
+            reason=(
+                f"تم التعرّف على عنوان الفصل التالي ضمن الصفحات الأولى: {variant} "
+                f"(الصفحة {page_number})."
+            ),
+            evidence=_evidence(
+                document_id,
+                page_number,
+                requirement.section,
+                excerpt,
+                verified=True,
+            ),
+            confidence=0.9,
+            evaluation_method="deterministic",
+        )
+    ocr_found = _find_variant_within(ocr_pages, variants, max_page=max_page)
+    if ocr_found is not None:
+        page_number, _variant, excerpt = ocr_found
+        if cer_store is not None and cer_store.allows_verified_evidence(document_id, page_number):
+            cer = cer_store.cer_for(document_id, page_number) or 0.0
+            return _result(
+                requirement,
+                status="Met",
+                reason=(
+                    f"تم التعرّف على عنوان الفصل من نص OCR على الصفحة {page_number}. "
+                    f"معدل خطأ OCR المقاس {cer * 100:.2f}٪ ضمن الحد المسموح به."
+                ),
+                evidence=_evidence(
+                    document_id,
+                    page_number,
+                    requirement.section,
+                    excerpt,
+                    verified=True,
+                    chunk_suffix="ocr",
+                ),
+                confidence=0.85,
+                evaluation_method="deterministic",
+            )
+    return _result(
+        requirement,
+        status="Needs Review",
+        reason=(
+            "لم يُعثر على فصل مخصص لقواعد الحوكمة ضمن الصفحات الأولى من التقرير. "
+            "تحتاج المسألة إلى مراجعة بشرية."
+        ),
+        evidence=None,
+        confidence=0.3,
+        evaluation_method="deterministic",
+    )
+
+
+def _review_table_structure(
+    document_id: str,
+    requirement: Requirement,
+    pages: dict[int, str],
+    ocr_pages: dict[int, str],
+    *,
+    cer_store: MeasurementStore | None = None,
+) -> ReviewResult:
+    """Met when an anchor is on a page that also contains a tabular block."""
+
+    variants, min_cols, min_rows = TABLE_STRUCTURE_RULES[requirement.requirement_id]
+    # Pass 1: embedded pages that have both the anchor and a table-shaped region.
+    for page_number in sorted(pages):
+        text = pages[page_number]
+        if _find_variant({page_number: text}, variants) is None:
+            continue
+        if _has_table_structure(text, min_cols=min_cols, min_rows=min_rows):
+            match = _find_variant({page_number: text}, variants)
+            assert match is not None
+            _, variant, excerpt = match
+            return _result(
+                requirement,
+                status="Met",
+                reason=(
+                    f"تم التعرّف على عبارة {variant} مع بنية جدولية على الصفحة {page_number}."
+                ),
+                evidence=_evidence(
+                    document_id,
+                    page_number,
+                    requirement.section,
+                    excerpt,
+                    verified=True,
+                ),
+                confidence=0.88,
+                evaluation_method="deterministic",
+            )
+    # Pass 2: anchor-only match stays Needs Review (presence without the table
+    # is not enough for Met, matching DIS-004 wording).
+    anchor_only = _find_variant(pages, variants)
+    if anchor_only is not None:
+        page_number, variant, excerpt = anchor_only
+        return _result(
+            requirement,
+            status="Needs Review",
+            reason=(
+                f"عُثر على عبارة {variant} على الصفحة {page_number}، لكن لم "
+                "تُلتقط بنية جدولية لعدد الموظفين حسب النشاط والموقع. "
+                "تحتاج المسألة إلى مراجعة بشرية."
+            ),
+            evidence=_evidence(
+                document_id,
+                page_number,
+                requirement.section,
+                excerpt,
+                verified=True,
+            ),
+            confidence=0.5,
+            evaluation_method="deterministic",
+        )
+    # OCR fallback mirrors the heading check.
+    ocr_found = _find_variant(ocr_pages, variants)
+    if ocr_found is not None:
+        page_number, _variant, excerpt = ocr_found
+        if cer_store is not None and cer_store.allows_verified_evidence(document_id, page_number):
+            text = ocr_pages[page_number]
+            if _has_table_structure(text, min_cols=min_cols, min_rows=min_rows):
+                cer = cer_store.cer_for(document_id, page_number) or 0.0
+                return _result(
+                    requirement,
+                    status="Met",
+                    reason=(
+                        f"تم التعرّف على بنية الجدول من نص OCR على الصفحة {page_number}. "
+                        f"معدل خطأ OCR المقاس {cer * 100:.2f}٪ ضمن الحد المسموح به."
+                    ),
+                    evidence=_evidence(
+                        document_id,
+                        page_number,
+                        requirement.section,
+                        excerpt,
+                        verified=True,
+                        chunk_suffix="ocr",
+                    ),
+                    confidence=0.82,
+                    evaluation_method="deterministic",
+                )
+    return _result(
+        requirement,
+        status="Needs Review",
+        reason=(
+            "لم يُعثر على بيان عدد الموظفين حسب النشاط والموقع في نص الصفحات. "
+            "تحتاج المسألة إلى مراجعة بشرية."
         ),
         evidence=None,
         confidence=0.3,
@@ -409,18 +994,139 @@ def _missing(requirement: Requirement) -> ReviewResult:
     )
 
 
+def _approx_raw_offset(raw_text: str, normalized_text: str, normalized_offset: int) -> int:
+    """Scale a normalized character offset back to a raw-text offset.
+
+    Normalization folds alef variants, strips hamza/tashkeel, and collapses
+    whitespace, so the raw and normalized strings have slightly different
+    lengths. The excerpt window is wide (60 before, 180 after), so an
+    approximate offset is enough for the reviewer to see the matched phrase
+    with surrounding context.
+    """
+
+    if not normalized_text:
+        return 0
+    ratio = len(raw_text) / len(normalized_text)
+    return max(0, min(len(raw_text), int(round(normalized_offset * ratio))))
+
+
 def _find_variant(
     pages: dict[int, str],
     variants: tuple[str, ...],
 ) -> tuple[int, str, str] | None:
+    """Return the first (page, variant, excerpt) match across pages.
+
+    Variants are matched by the affix-tolerant regex built in
+    :func:`_anchor_pattern`, so an Arabic anchor like ``الميزانية`` also
+    matches ``للميزانية``, ``بالميزانية``, and ``وبالميزانية`` without us
+    needing to enumerate every prefixed form in the variants tuple.
+
+    Both the anchor and the page text are passed through
+    :func:`normalize_arabic` before matching, so a page that writes
+    ``ادارة`` (without hamza) still matches an anchor written ``إدارة``.
+    The returned excerpt is cut from the raw page text so the reviewer
+    sees the original diacritics and spacing.
+    """
+
+    compiled = [
+        (variant, _anchor_pattern(normalize_arabic(variant))) for variant in variants
+    ]
     for page_number in sorted(pages):
-        text = pages[page_number]
-        folded = text.casefold()
-        for variant in variants:
-            index = folded.find(variant.casefold())
-            if index >= 0:
-                return page_number, variant, _window(text, index, len(variant))
+        raw_text = pages[page_number]
+        normalized_text = normalize_arabic(raw_text)
+        for variant, pattern in compiled:
+            match = pattern.search(normalized_text)
+            if match is not None:
+                raw_offset = _approx_raw_offset(raw_text, normalized_text, match.start())
+                length = max(len(variant), match.end() - match.start())
+                return page_number, variant, _window(raw_text, raw_offset, length)
     return None
+
+
+def _find_variants_on_same_page(
+    pages: dict[int, str],
+    anchor_groups: tuple[tuple[str, ...], ...],
+) -> tuple[int, str] | None:
+    """Return a (page, excerpt) when every anchor group hits the same page.
+
+    Each inner tuple is a set of synonyms; one hit per group is enough. The
+    excerpt is pulled from around the first-group match on that page.
+    Matching uses the normalized Arabic view just like :func:`_find_variant`.
+    """
+
+    compiled: list[list[re.Pattern[str]]] = [
+        [_anchor_pattern(normalize_arabic(v)) for v in group] for group in anchor_groups
+    ]
+    for page_number in sorted(pages):
+        raw_text = pages[page_number]
+        normalized_text = normalize_arabic(raw_text)
+        first_match: re.Match[str] | None = None
+        all_present = True
+        for patterns in compiled:
+            match = next(
+                (m for pattern in patterns if (m := pattern.search(normalized_text))), None
+            )
+            if match is None:
+                all_present = False
+                break
+            if first_match is None:
+                first_match = match
+        if all_present and first_match is not None:
+            length = max(1, first_match.end() - first_match.start())
+            raw_offset = _approx_raw_offset(raw_text, normalized_text, first_match.start())
+            return page_number, _window(raw_text, raw_offset, length)
+    return None
+
+
+def _find_variant_within(
+    pages: dict[int, str],
+    variants: tuple[str, ...],
+    *,
+    max_page: int,
+) -> tuple[int, str, str] | None:
+    """Match :func:`_find_variant` but ignore pages past ``max_page``."""
+
+    subset = {page: text for page, text in pages.items() if page <= max_page}
+    return _find_variant(subset, variants)
+
+
+def _has_table_structure(
+    text: str,
+    *,
+    min_cols: int,
+    min_rows: int,
+) -> bool:
+    """True when ``text`` looks like a table of counts.
+
+    Two signals, either of which qualifies:
+
+    * At least ``min_rows`` lines contain ``min_cols + 1`` or more segments
+      separated by runs of whitespace (tab, Arabic wide space, two or more
+      regular spaces). This matches PDF text-extraction output that
+      preserves column gaps as whitespace runs.
+    * The page contains at least ``min_rows * (min_cols + 1)`` digit groups
+      (Western 0-9 or Arabic-Indic ٠-٩). Arabic reports often strip
+      inter-column whitespace during extraction, so a dense cluster of
+      numbers near the anchor is the reliable fallback signal that the
+      page is a table of counts rather than prose about counts.
+    """
+
+    row_hits = 0
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        segments = [seg for seg in re.split(r"[\t\u3000 ]{2,}", stripped) if seg]
+        if len(segments) >= min_cols + 1:
+            row_hits += 1
+            if row_hits >= min_rows:
+                return True
+    # Fallback: count digit groups on the page. A line like "97 108 111 105"
+    # loses its column gaps during PDF text extraction but still carries the
+    # tabular signal through the digits themselves.
+    digit_group_count = len(re.findall(r"[0-9\u0660-\u0669]+", text))
+    required = min_rows * (min_cols + 1)
+    return digit_group_count >= required
 
 
 def _window(text: str, index: int, length: int) -> str:
